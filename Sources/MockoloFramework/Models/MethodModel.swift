@@ -34,7 +34,7 @@ struct MethodModel: Model {
     let isInitializer: Bool
     
     init(_ ast: Structure, content: String, processed: Bool) {
-        var comps = ast.name.components(separatedBy: CharacterSet(arrayLiteral: ":", "(", ")")).filter{!$0.isEmpty}
+        var comps = ast.name.components(separatedBy: CharacterSet(arrayLiteral: ":", "(", ")")).filter {!$0.isEmpty}
         let nameString = comps.removeFirst()
         self.content = content
         self.name = nameString
@@ -46,8 +46,9 @@ struct MethodModel: Model {
         self.length = ast.range.length
 
         let paramDecls = ast.substructures.filter(path: \.isVarParameter)
-        assert(paramDecls.count == comps.count)
-
+        if paramDecls.count > 0 {
+            assert(paramDecls.count == comps.count)
+        }
         self.params = zip(paramDecls, comps).map { (argModel: Structure, argLabel: String) -> ParamModel in
             ParamModel(argModel, label: argLabel)
         }

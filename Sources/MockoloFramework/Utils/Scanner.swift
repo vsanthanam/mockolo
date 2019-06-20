@@ -24,14 +24,33 @@ func scanDirectory(_ path: String, with callBack: (String) -> Void) {
     if let enumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: path, isDirectory: true), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles], errorHandler: errorHandler) {
         while let nextObjc = enumerator.nextObject() {
             if let fileUrl = nextObjc as? URL {
+                dcount += 1
                 callBack(fileUrl.path)
             }
         }
     }
 }
 
+var dcount = 0
 func scanPaths(_ paths: [String], with callBack: (String) -> Void) {
     for path in paths {
         scanDirectory(path, with: callBack)
     }
+}
+
+var result = [String]()
+func scanPaths(_ paths: [String]) -> [String]? {
+    for path in paths {
+        let errorHandler = { (url: URL, error: Error) -> Bool in
+            fatalError("Failed to traverse \(url) with error \(error).")
+        }
+        if let enumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: path, isDirectory: true), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles], errorHandler: errorHandler) {
+            while let nextObjc = enumerator.nextObject() {
+                if let fileUrl = nextObjc as? URL {
+                    result.append(fileUrl.path)
+                }
+            }
+        }
+    }
+    return result
 }

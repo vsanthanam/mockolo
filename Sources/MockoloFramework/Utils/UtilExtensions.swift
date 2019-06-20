@@ -68,9 +68,10 @@ extension String {
     
     func shouldParse(with exclusionList: [String]? = nil) -> Bool {
         guard hasSuffix(".swift") else { return false }
-        
-        if let name = components(separatedBy: ".swift").first, let exlist = exclusionList {
-            for ex in exlist {
+        guard let exclusionList = exclusionList else { return true }
+
+        if let name = components(separatedBy: ".swift").first {
+            for ex in exclusionList {
                 if name.hasSuffix(ex) {
                     return false
                 }

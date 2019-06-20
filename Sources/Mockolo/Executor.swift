@@ -108,9 +108,12 @@ class Executor {
     /// - parameter arguments: The command line arguments to execute the command with.
     func execute(with arguments: ArgumentParser.Result) {
 
-        guard let outputFilePath = arguments.get(outputFilePath) else { fatalError("Missing destination file path") }
-        
-        let srcDirs = arguments.get(sourceDirs)
+        let root = "/Users/ellie/uber/ios"
+        let outputFilePath =  root + "/mockresult.swift"
+//        guard let outputFilePath = arguments.get(outputFilePath) else { fatalError("Missing destination file path") }
+        let lib = root + "/libraries"
+        let app = root + "/apps/iphone-helix/src/Uber"
+        let srcDirs = [lib, app]
         let srcs = arguments.get(sourceFiles)
         if sourceDirs == nil, srcs == nil {
             fatalError("Missing source files or their directory")
@@ -118,11 +121,11 @@ class Executor {
         
         let exclusionSuffixes = arguments.get(self.exclusionSuffixes) ?? []
         let mockFilePaths = arguments.get(self.mockFilePaths) ?? []
-        let concurrencyLimit = arguments.get(self.concurrencyLimit)
-        let annotation = arguments.get(self.annotation) ?? String.mockAnnotation
+        let concurrencyLimit = 1 //arguments.get(self.concurrencyLimit)
+        let annotation = "@CreateMock" // arguments.get(self.annotation) ?? String.mockAnnotation
         let header = arguments.get(self.header)
         let annotatedOnly = arguments.get(self.annotatedOnly) ?? true
-        let loggingLevel = arguments.get(self.loggingLevel) ?? 0
+        let loggingLevel = 3 //arguments.get(self.loggingLevel) ?? 0
         let macro = arguments.get(self.macro)
         
         do {
@@ -136,7 +139,9 @@ class Executor {
                          macro: macro, 
                          to: outputFilePath,
                          loggingLevel: loggingLevel,
-                         concurrencyLimit: concurrencyLimit)
+                         concurrencyLimit: concurrencyLimit) { ret in
+                                log("Program exiting.")
+                         }
         } catch {
             fatalError("Generation error: \(error)")
         }

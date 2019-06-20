@@ -17,7 +17,6 @@
 import Foundation
 import SourceKittenFramework
 
-
 /// Performs end to end mock generation flow
 
 public func generate(sourceDirs: [String]?,
@@ -30,7 +29,8 @@ public func generate(sourceDirs: [String]?,
                      macro: String?,
                      to outputFilePath: String,
                      loggingLevel: Int,
-                     concurrencyLimit: Int?) throws {
+                     concurrencyLimit: Int?,
+                     onCompletion: @escaping (String) -> ()) throws {
     
     assert(sourceDirs != nil || sourceFiles != nil)
     minLogLevel = loggingLevel
@@ -64,7 +64,19 @@ public func generate(sourceDirs: [String]?,
     let t1 = CFAbsoluteTimeGetCurrent()
     log("Took", t1-t0, level: .verbose)
     
+    if 1 < 0 {
+        executeTasks(dirs: sourceDirs, files: sourceFiles, annotatedOnly: annotatedOnly, annotation: annotation, outputFilePath: outputFilePath, semaphore: sema, queue: mockgenQueue, process: { ret in
+            log("FINALLY DONE")
+            onCompletion(ret)
+            exit(0)
+        })
+        Thread.sleep(forTimeInterval: 200)
+        return
+    }
+    
     log("Process source files and generate an annotated/protocol map...", level: .info)
+    var c1 = 0
+    var c2 = 0
     generateProtocolMap(sourceDirs: sourceDirs,
                         sourceFiles: sourceFiles,
                         exclusionSuffixes: exclusionSuffixes,
@@ -72,16 +84,18 @@ public func generate(sourceDirs: [String]?,
                         annotation: annotation,
                         semaphore: sema,
                         queue: mockgenQueue) { (elements) in
+                            c1 += elements.count
                             elements.forEach { element in
                                 protocolMap[element.name] = element
                                 if element.isAnnotated {
+                                    c2 += 1
                                     annotatedProtocolMap[element.name] = element
                                 }
                             }
     }
     
     let t2 = CFAbsoluteTimeGetCurrent()
-    log("Took", t2-t1, level: .verbose)
+    log("Took", t2-t1, "paths", dcount, "#files", fcount, "#p", c1, "#ann", c2, level: .verbose)
     
     let typeKeyList = [parentMocks.compactMap {$0.key.components(separatedBy: "Mock").first}, annotatedProtocolMap.map {$0.key}].flatMap{$0}
     var typeKeys = [String: String]()
@@ -130,4 +144,6 @@ public func generate(sourceDirs: [String]?,
     let count = result.components(separatedBy: "\n").count
     log("TOTAL", t5-t0, level: .verbose)
     log("#Protocols = \(protocolMap.count), #Annotated protocols = \(annotatedProtocolMap.count), #Parent mock classes = \(parentMocks.count), #Final mock classes = \(candidates.count), File LoC = \(count)", level: .verbose)
+    
+    onCompletion(result)
 }

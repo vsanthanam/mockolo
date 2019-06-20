@@ -95,8 +95,9 @@ public func generate(sourceDirs: [String]?,
     }
     
     let t2 = CFAbsoluteTimeGetCurrent()
-    log("Took", t2-t1, "paths", dcount, "#files", fcount, "#p", c1, "#ann", c2, level: .verbose)
-    
+//    log("Took", t2-t1, "paths", dcount, "#files", fcount, "#p", c1, "#ann", c2, level: .verbose)
+    log("Took", t2-t1, "paths", dcount, level: .verbose)
+
     let typeKeyList = [parentMocks.compactMap {$0.key.components(separatedBy: "Mock").first}, annotatedProtocolMap.map {$0.key}].flatMap{$0}
     var typeKeys = [String: String]()
     typeKeyList.forEach { (t: String) in

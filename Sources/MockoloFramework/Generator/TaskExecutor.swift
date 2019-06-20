@@ -90,7 +90,7 @@ func executeTasks(dirs: [String]?,
                         let modelSeq = ModelTask.sequence([modelGroup])
                         
                         modelSeq.perform(on: queue, with: { (resolvedResult: TaskResultType) in
-                            if let resList = (try? resolvedResult.get()) as? [Resolved] {
+                            if let resList = (try? resolvedResult.get()) as? [ResolvedEntityContainer] {
                                 let t3 = CFAbsoluteTimeGetCurrent()
                                 log("Took", t3-t2, level: .verbose)
                                 log("Render models ...")

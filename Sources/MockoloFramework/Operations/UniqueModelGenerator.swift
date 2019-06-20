@@ -47,7 +47,7 @@ func generateUniqueModels(key: String,
                           entity: Entity,
                           typeKeys: [String: String]?,
                           protocolMap: [String: Entity],
-                          inheritanceMap: [String: Entity]) -> Resolved {
+                          inheritanceMap: [String: Entity]) -> ResolvedEntityContainer {
     let (models, processedModels, attributes, pathToContentList) = lookupEntities(key: key, protocolMap: protocolMap, inheritanceMap: inheritanceMap)
     let containsInit = models.filter(path: \.isInitializer).count > 0
     let processedFullNames = processedModels.compactMap {$0.fullName}
@@ -74,9 +74,9 @@ func generateUniqueModels(key: String,
     let uniqueModels = [mockedUniqueEntities, unmockedUniqueEntities].flatMap {$0}.sorted {$0.1.offset < $1.1.offset}
     let initVars = containsInit ? nil: potentialInitVars(in: unmockedUniqueEntities, processed: mockedUniqueEntities)
     
-    let container = ResolvedEntity(key: key, entity: entity, uniqueModels: uniqueModels, attributes: attributes, hasInit: containsInit, initVars: initVars)
+    let resolvedEntity = ResolvedEntity(key: key, entity: entity, uniqueModels: uniqueModels, attributes: attributes, hasInit: containsInit, initVars: initVars)
     
-    return Resolved(entity: container, imports: pathToContentList)
+    return ResolvedEntityContainer(entity: resolvedEntity, imports: pathToContentList)
 }
 
 func generateUniqueModels(key: String,

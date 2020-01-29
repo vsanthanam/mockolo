@@ -70,6 +70,10 @@ extension ModifierListSyntax {
         return self.tokens.filter {$0.text == String.required }.count > 0
     }
 
+    var isConvenience: Bool {
+        return self.tokens.filter {$0.text == String.convenience }.count > 0
+    }
+
     var isOverride: Bool {
         return self.tokens.filter {$0.text == String.override }.count > 0
     }
@@ -106,9 +110,11 @@ extension MemberDeclListSyntax {
                 memberList.append(funcMember.model(with: acl, declType: declType, processed: processed))
                 attrDesc = funcMember.attributes?.trimmedDescription
             } else if let initMember = m.decl as? InitializerDeclSyntax {
-                hasInit = true
-                memberList.append(initMember.model(with: acl, declType: declType, processed: processed))
-                attrDesc = initMember.attributes?.trimmedDescription
+                if !processed || initMember.isRequired(with: declType) {
+                    hasInit = true
+                    memberList.append(initMember.model(with: acl, declType: declType, processed: processed))
+                    attrDesc = initMember.attributes?.trimmedDescription
+                }
             } else if let patMember = m.decl as? AssociatedtypeDeclSyntax {
                 memberList.append(patMember.model(with: acl, overrides: overrides, processed: processed))
                 attrDesc = patMember.attributes?.trimmedDescription
@@ -199,6 +205,7 @@ extension ClassDeclSyntax: EntityNode {
 }
 
 extension VariableDeclSyntax {
+    
     func models(with acl: String, declType: DeclType, processed: Bool) -> [Model] {
         // Detect whether it's static
         var isStatic = false
@@ -210,12 +217,12 @@ extension VariableDeclSyntax {
         let varmodels = self.bindings.compactMap { (v: PatternBindingSyntax) -> Model in
             let name = v.pattern.firstToken?.text ?? String.unknownVal
             var typeName = ""
-            var canBeInitParam = false
+            var potentialInitParam = false
             
             // Get the type info and whether it can be a var param for an initializer
             if let vtype = v.typeAnnotation?.type.description {
                 typeName = vtype
-                canBeInitParam = !isStatic &&
+                potentialInitParam = !isStatic &&
                     !vtype.hasSuffix("?") &&
                     !name.hasPrefix(.underlyingVarPrefix) &&
                     !name.hasSuffix(.closureVarSuffix) &&
@@ -229,7 +236,7 @@ extension VariableDeclSyntax {
                                          acl: acl,
                                          encloserType: declType,
                                          isStatic: isStatic,
-                                         canBeInitParam: canBeInitParam,
+                                         canBeInitParam: potentialInitParam,
                                          offset: v.offset,
                                          length: v.length,
                                          modelDescription: self.description,
@@ -296,21 +303,24 @@ extension FunctionDeclSyntax {
 }
 
 extension InitializerDeclSyntax {
-    func model(with acl: String, declType: DeclType, processed: Bool) -> Model {
-        var isRequired = false
-        
+    func isRequired(with declType: DeclType) -> Bool {
         if declType == .protocolType {
-            isRequired = true
+            return true
         } else if declType == .classType, let modifiers = self.modifiers {
-            isRequired = modifiers.isRequired
+            return modifiers.isRequired
         }
+        return false
+    }
+    
+    func model(with acl: String, declType: DeclType, processed: Bool) -> Model {
+        let requiredInit = isRequired(with: declType)
         
         let params = self.parameters.parameterList.compactMap { $0.model(inInit: true, declType: declType) }
         let genericTypeParams = self.genericParameterClause?.genericParameterList.compactMap { $0.model(inInit: true) } ?? []
         
         return MethodModel(name: "init",
                            typeName: "",
-                           kind: .initKind(required: isRequired),
+                           kind: .initKind(required: requiredInit),
                            encloserType: declType,
                            acl: acl,
                            genericTypeParams: genericTypeParams,

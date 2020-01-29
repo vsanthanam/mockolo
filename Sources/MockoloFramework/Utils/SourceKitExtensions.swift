@@ -129,6 +129,7 @@ extension Structure: EntityNode {
         if element.isVariable {
             return VariableModel(element, encloserType: encloserType, filepath: filepath, data: data, processed: processed)
         } else if element.isMethod || element.isSubscript { // initializer is considered a method by sourcekit
+            if processed, element.isInitializer, !element.isRequired { return nil }
             return MethodModel(element, encloserType: encloserType, filepath: filepath, data: data, processed: processed)
         } else if element.isAssociatedType || element.isTypealias {
             return TypeAliasModel(element, filepath: filepath, data: data, overrideTypes: overrides, processed: processed)

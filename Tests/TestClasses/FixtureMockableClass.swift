@@ -1,35 +1,8 @@
 import MockoloFramework
 
 
-let klassParent =
-"""
-
-public class High {
-     init(orderId: Int) {
-        self.order = orderId
-    }
-     init(orderId: Int, loc: String) {
-        self.order = orderId
-    }
-    var order: Int
-    func baz() -> Double { return 5.6 }
-}
-
-"""
-
-let klass =
-"""
-protocol Level {
-    var name: String { get set }
-    func foo() -> Int
-    init(arg: String)
-}
-
-public class Mid: High {
-    var what: Float = 0.0
-    func bar() {}
-}
-
+//let klass =
+//"""
 /// \(String.mockAnnotation)
 public class Low: Mid {
 
@@ -39,13 +12,13 @@ public class Low: Mid {
         super.init(orderId: 1)
         self.name = arg
     }
-    
-    init(i: Int) {
-        super.init(orderId: i)
+
+    override init(orderId: Int) {
+        super.init(orderId: orderId)
     }
 
-    init(d: Double) {
-        super.init(orderId: 9, loc: "")
+    init(i: Int) {
+        super.init(orderId: i)
     }
     
     override var what: Float {
@@ -64,11 +37,29 @@ public class Low: Mid {
     }
 }
 
-"""
+public class Mid: High {
+    var what: Float = 0.0
+    func bar() {}
+}
+//"""
+//
+//let klassParent =
+//"""
 
-
-let klassParentMock =
-"""
+public class High {
+     init(orderId: Int) {
+        self.order = orderId
+    }
+     init(orderId: Int, loc: String) {
+        self.order = orderId
+    }
+    var order: Int
+    func baz() -> Double { return 5.6 }
+}
+//"""
+//
+//let klassParentMock =
+//"""
 public class HighMock: High {
     private var _doneInit = false
 
@@ -78,7 +69,7 @@ public class HighMock: High {
     }
 
     override init(orderId: Int, loc: String) {
-        super.init(orderId: orderId, loc: m)
+        super.init(orderId: orderId, loc: loc)
         _doneInit = true
     }
 
@@ -103,11 +94,73 @@ public class HighMock: High {
         return 0.0
     }
 }
-"""
 
-let klassMock =
-"""
-    public class LowMock: Low {
+//"""
+//
+//let klassMock =
+//"""
+
+public class LowMock: Low {
+
+    private var _doneInit = false
+    var nameSetCallCount = 0
+    var underlyingName: String = ""
+    override var name: String {
+        get { return underlyingName }
+        set {
+            underlyingName = newValue
+            if _doneInit { nameSetCallCount += 1 }
+        }
+    }
+    required init(arg: String) {
+        super.init(arg: arg)
+        _doneInit = true
+    }
+    override init(orderId: Int) {
+        super.init(orderId: orderId)
+        _doneInit = true
+    }
+    override init(i: Int) {
+        super.init(i: i)
+        _doneInit = true
+    }
+    
+    var whatSetCallCount = 0
+    var underlyingWhat: Float = 0.0
+    override var what: Float {
+        get { return underlyingWhat }
+        set {
+            underlyingWhat = newValue
+            if _doneInit { whatSetCallCount += 1 }
+        }
+    }
+    var barCallCount = 0
+    var barHandler: (() -> ())?
+    override func bar()  {
+        barCallCount += 1
+
+        if let barHandler = barHandler {
+            barHandler()
+        }
+        
+    }
+    var fooCallCount = 0
+    var fooHandler: (() -> (Int))?
+    override func foo() -> Int {
+        fooCallCount += 1
+
+        if let fooHandler = fooHandler {
+            return fooHandler()
+        }
+        return 0
+    }
+}
+
+//"""
+//
+//let klassLongerMock =
+//"""
+    public class LowMock2: Low {
 
         private var _doneInit = false
             
@@ -123,17 +176,17 @@ let klassMock =
             }
         }
         required public init(arg: String) {
-        super.init(arg: arg)
+            super.init(arg: arg)
             _doneInit = true
         }
         override public init(i: Int) {
-        super.init(i: i)
+            super.init(i: i)
             _doneInit = true
         }
-        override public init(d: Double) {
-        super.init(d: d)
-            _doneInit = true
-        }
+
+        var orderSetCallCount = 0
+
+        var underlyingOrder: Int = 0
         
         public var whatSetCallCount = 0
         var underlyingWhat: Float = 0.0
@@ -143,67 +196,6 @@ let klassMock =
                 underlyingWhat = newValue
                 if _doneInit { whatSetCallCount += 1 }
             }
-        }
-        public var barCallCount = 0
-        public var barHandler: (() -> ())?
-        public override func bar()  {
-            barCallCount += 1
-
-            if let barHandler = barHandler {
-                barHandler()
-            }
-            
-        }
-        public var fooCallCount = 0
-        public var fooHandler: (() -> (Int))?
-        public override func foo() -> Int {
-            fooCallCount += 1
-
-            if let fooHandler = fooHandler {
-                return fooHandler()
-            }
-            return 0
-        }
-    }
-
-
-"""
-
-
-
-let klassLongerMock =
-"""
-    public class LowMock: Low {
-
-        private var _doneInit = false
-            
-        
-            
-        public var nameSetCallCount = 0
-        var underlyingName: String = ""
-        public override var name: String {
-            get { return underlyingName }
-            set {
-                underlyingName = newValue
-                if _doneInit { nameSetCallCount += 1 }
-            }
-        }
-        required public init(arg: String) {
-        super.init(arg: arg)
-            _doneInit = true
-        }
-        override public init(i: Int) {
-        super.init(i: i)
-            _doneInit = true
-        }
-
-
-        var orderSetCallCount = 0
-
-        var underlyingOrder: Int = 0
-        override public init(d: Double) {
-        super.init(d: d)
-            _doneInit = true
         }
 
         override var order: Int {
@@ -213,16 +205,6 @@ let klassLongerMock =
                 if _doneInit { orderSetCallCount += 1 }
             }
         }
-        
-        public var whatSetCallCount = 0
-        var underlyingWhat: Float = 0.0
-        public override var what: Float {
-            get { return underlyingWhat }
-            set {
-                underlyingWhat = newValue
-                if _doneInit { whatSetCallCount += 1 }
-            }
-        }
         public var barCallCount = 0
         public var barHandler: (() -> ())?
         public override func bar()  {
@@ -233,9 +215,6 @@ let klassLongerMock =
             }
             
         }
-
-
-        var bazCallCount = 0
         public var fooCallCount = 0
         public var fooHandler: (() -> (Int))?
         public override func foo() -> Int {
@@ -246,6 +225,9 @@ let klassLongerMock =
             }
             return 0
         }
+
+
+        var bazCallCount = 0
 
         var bazHandler: (() -> (Double))?
 
@@ -258,4 +240,5 @@ let klassLongerMock =
             return 0.0
         }
     }
-"""
+
+//"""

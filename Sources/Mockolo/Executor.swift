@@ -125,6 +125,7 @@ class Executor {
     ///
     /// - parameter arguments: The command line arguments to execute the command with.
     func execute(with arguments: ArgumentParser.Result) {
+      
         guard let outputArg = arguments.get(outputFilePath) else { fatalError("Missing destination file path") }
         let outputFilePath = fullPath(outputArg)
 
@@ -180,3 +181,145 @@ class Executor {
         }
     }
 }
+
+
+
+//class X {
+//    dynamic func foo() {
+//        print("fppo")
+//    }
+//}
+//
+//extension X {
+//
+//    convenience init(arg: Int) {
+//        self.init()
+//    }
+//    var barCallcount: Int {
+////        didSet {
+////        }
+//        let k = Context(id: ObjectIdentifier(self), function: #function)
+//        return sideTable[k] ?? 0
+//    }
+//
+//    var barHandler: (() -> ())? {
+//        get {
+//            let ret = varTable[Context(id: ObjectIdentifier(self), function: #function)]
+//            return ret
+//        }
+//        set {
+//            varTable[Context(id: ObjectIdentifier(self), function: #function)] = newValue
+//        }
+//    }
+//
+////    var underlyingBarHandler: (() -> ())?
+//
+//    @_dynamicReplacement(for: foo)
+//    func bar() {
+//        let key = Context(id: ObjectIdentifier(self), function: #function)
+//
+//        if sideTable[key] == nil {
+//            sideTable[key] = 0
+//        }
+//        sideTable[key]? += 1
+//
+//        if let barHandler = varTable[Context(id: ObjectIdentifier(self), function: #function)] {
+//            barHandler()
+//        }
+//        print("bbb")
+//    }
+//}
+//
+//struct Context: Hashable {
+//    static func == (lhs: Context, rhs: Context) -> Bool {
+//        return lhs.function.description == rhs.function.description &&
+//                lhs.id == rhs.id
+//    }
+//
+//    func hash(into hasher: inout Hasher) {
+//
+//    }
+//
+//    let id: ObjectIdentifier
+//    let function: StaticString
+//}
+//
+//struct Closure {
+//
+//
+//}
+//
+//var sideTable: [Context: Int] = [:]
+//var varTable: [Context: (() -> ())] = [:]
+
+
+class Z {
+
+    init(z: Float) {}
+}
+
+class Y: Z {
+    
+    var smth: String = ""
+    init(omg: String) {
+        super.init(z: 3.1)
+    }
+//    init() {
+//
+//    }
+
+}
+
+class X: Y {
+
+    let order: Int
+
+    required init(arg: Int = 0) {
+        self.order = arg
+        super.init(omg: "")
+    }
+//    override init(omg: String) {
+//        self.order = 1
+//        super.init(omg: "")
+//    }
+    convenience init(x: Double) {
+        self.init(arg: 3)
+    }
+//    init() {
+//        self.order = 1
+//        super.init(omg: "")
+////        super.init(omg: "")
+//    }
+}
+
+class XMocks: X {
+
+    // override has to override desginated init in immeidate parent not convenience init
+
+//    override init() {
+//        super.init(arg: 3)
+//    }
+
+//    var name: String
+
+    private var flag: Bool = false
+    init() {
+        flag = true
+//        self.init(arg: 3)
+    }
+    
+    required init(arg: Int) {
+        super.init(arg: arg)
+    }
+    
+    convenience init(x: Double) {
+        self.init(arg: 3)
+    }
+
+
+}
+
+
+let x = XMocks(arg:3)
+
+

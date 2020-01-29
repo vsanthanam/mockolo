@@ -23,8 +23,6 @@ struct ResolvedEntity {
     let entity: Entity
     let uniqueModels: [(String, Model)]
     let attributes: [String]
-    let hasInit: Bool
-    let initVars: [Model]?
     let typealiasWhitelist: [String: [String]]?
     
     func model() -> Model {
@@ -33,8 +31,6 @@ struct ResolvedEntity {
                           declType: entity.entityNode.declType,
                           attributes: attributes,
                           offset: entity.entityNode.offset,
-                          needInit: !hasInit,
-                          initParams: initVars,
                           typealiasWhitelist: typealiasWhitelist,
                           entities: uniqueModels)
     }

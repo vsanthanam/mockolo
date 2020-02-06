@@ -180,4 +180,46 @@ class Executor {
             fatalError("Generation error: \(error)")
         }
     }
+    
+    
+     func mexecute(with arguments: ArgumentParser.Result) {
+          
+    //        omg()
+    //        return
+            
+            let root = "/Users/ellie/uber/mirror/ios"
+            let srcDirs = [root + "/buck-out/gen/libraries/feature/Help/HelpMocks__srcs"]
+        let srcs = [root + "/libraries/feature/Help/Help/HelpWorkflow/HelpWorkflowInteractor.swift"]
+            let outputFilePath = root + "/results.swift"
+            let mstr = "/Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/common/FeatureMonitor/FeatureMonitorMocks/FeatureMonitorMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/common/RealtimePolaris/RealtimePolarisMocks/RealtimePolarisMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/common/SharedUI/SharedUIMocks/SharedUIMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/common/Tokenizer/TokenizerMocks/TokenizerMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/common/Web/WebMocks/WebMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/common/screenflow/Screenflow/Modules/RealtimeScreenflow/RealtimeScreenflowMocks/RealtimeScreenflowMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/common/screenflow/Screenflow/ScreenflowMocks/ScreenflowMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/common/screenflow/ScreenflowSDK/ScreenflowSDKMocks/ScreenflowSDKMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/feature/AppSharedProtocols/AppSharedProtocolsMocks/AppSharedProtocolsMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/feature/RealtimeIntercom/RealtimeIntercomMocks/RealtimeIntercomMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/AutopatcherProxy/AutopatcherProxyMocks/AutopatcherProxyMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/Experimentation/ExperimentationMocks/ExperimentationMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/Healthline/HealthlineMocks/HealthlineMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/PlatformUI/PlatformUIMocks/PlatformUIMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/Presidio/PresidioMocks/PresidioMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/PresidioFoundation/PresidioFoundationMocks/PresidioFoundationMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/PresidioUtilities/PresidioUtilitiesMocks/PresidioUtilitiesMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/Realtime/RealtimeMocks/RealtimeMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/RealtimePlatformUI/RealtimePlatformUIMocks/RealtimePlatformUIMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/RealtimePresidio/RealtimePresidioMocks/RealtimePresidioMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/libraries/foundation/Storage/StorageMocks/StorageMocks.swift /Users/ellie/Uber/mirror/ios/buck-out/gen/vendor/needle-foundation/NeedleFoundationMocks/NeedleFoundationMocks.swift"
+            
+        let mockFilePaths = mstr.components(separatedBy: " ")
+            let concurrencyLimit = arguments.get(self.concurrencyLimit)
+            let exclusionSuffixes = ["Tests", "Mocks", "Test", "Mock", "Models", "Images", "Strings"]
+            let annotation = "@CreateMock" // arguments.get(self.annotation) ?? String.mockAnnotation
+            let header = "" // arguments.get(self.header)
+            let loggingLevel = 3 //arguments.get(self.loggingLevel) ?? 0
+            let macro = "MOCK" //arguments.get(self.macro)
+            let shouldUseSourceKit = false //arguments.get(useSourceKit) ?? false
+
+            do {
+                try generate(sourceDirs: nil,//srcDirs,
+                             sourceFiles: srcs, //nil,
+                             parser: ParserViaSwiftSyntax(),
+                             exclusionSuffixes: exclusionSuffixes,
+                             mockFilePaths: mockFilePaths,
+                             annotation: annotation,
+                             header: header,
+                             macro: macro,
+                             to: outputFilePath,
+                             loggingLevel: loggingLevel,
+                             concurrencyLimit: concurrencyLimit,
+                             onCompletion: { _ in
+                        log("Done. Exiting program.", level: .info)
+                        exit(0)
+                })
+            } catch {
+                fatalError("Generation error: \(error)")
+            }
+        }
 }

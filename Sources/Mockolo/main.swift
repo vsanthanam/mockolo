@@ -36,5 +36,14 @@ func main() {
     print("Done.")
 }
 
+class Y {
+    public func onCloseHelpIssuesList()  { }
+
+}
+class X: Y {
+override
+public func onCloseHelpIssuesList()  {
+}
+}
 
 main()

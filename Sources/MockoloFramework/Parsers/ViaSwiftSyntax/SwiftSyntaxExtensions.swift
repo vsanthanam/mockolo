@@ -109,9 +109,11 @@ extension TypeInheritanceClauseSyntax {
 
 extension MemberDeclListSyntax {
     
-    private func validateMember(_ modifiers: ModifierListSyntax?, _ declType: DeclType) -> Bool {
-        if let mods = modifiers, mods.isStatic, declType == .classType {
-            return false
+    private func validateMember(_ modifiers: ModifierListSyntax?, _ declType: DeclType, processed: Bool) -> Bool {
+        if let mods = modifiers {
+            if !processed && mods.isPrivate || mods.isStatic && declType == .classType {
+                return false
+            }
         }
         return true
     }
@@ -157,19 +159,19 @@ extension MemberDeclListSyntax {
         
         for m in self {
             if let varMember = m.decl as? VariableDeclSyntax {
-                if validateMember(varMember.modifiers, declType) {
+                if validateMember(varMember.modifiers, declType, processed: processed) {
                     let acl = memberAcl(varMember.modifiers, encloserAcl, declType)
                     memberList.append(contentsOf: varMember.models(with: acl, declType: declType, processed: processed))
                     attrDesc = varMember.attributes?.trimmedDescription
                 }
             } else if let funcMember = m.decl as? FunctionDeclSyntax {
-                if validateMember(funcMember.modifiers, declType) {
+                if validateMember(funcMember.modifiers, declType, processed: processed) {
                     let acl = memberAcl(funcMember.modifiers, encloserAcl, declType)
                     memberList.append(funcMember.model(with: acl, declType: declType, processed: processed))
                     attrDesc = funcMember.attributes?.trimmedDescription
                 }
             } else if let subscriptMember = m.decl as? SubscriptDeclSyntax {
-                if validateMember(subscriptMember.modifiers, declType) {
+                if validateMember(subscriptMember.modifiers, declType, processed: processed) {
                     let acl = memberAcl(subscriptMember.modifiers, encloserAcl, declType)
                     memberList.append(subscriptMember.model(with: acl, declType: declType, processed: processed))
                     attrDesc = subscriptMember.attributes?.trimmedDescription
@@ -516,6 +518,7 @@ final class EntityVisitor: SyntaxVisitor {
     let annotation: String
     
     init(annotation: String = "") {
+        log("Visitor is created")
         self.annotation = annotation
     }
     
@@ -533,14 +536,18 @@ final class EntityVisitor: SyntaxVisitor {
     }
     
     func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+        log("Class decl found", node.name, level: .info)
         if node.name.hasSuffix("Mock") {
+            log("Class decl is processed mock class", node.name, level: .info)
             // this mock class node must be public else wouldn't have compiled before
             if let ent = Entity.node(with: node, isPrivate: node.isPrivate, isFinal: false, metadata: nil, processed: true) {
                 entities.append(ent)
             }
         } else {
+            log("Class decl is to be processed", node.name, level: .info)
             let metadata = node.annotationMetadata(with: annotation)
             if let ent = Entity.node(with: node, isPrivate: node.isPrivate, isFinal: node.isFinal, metadata: metadata, processed: false) {
+                log("Class decl -- entity is created", node.name, level: .info)
                 entities.append(ent)
             }
         }

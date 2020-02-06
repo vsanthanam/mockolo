@@ -18,6 +18,77 @@ import Foundation
 import SourceKittenFramework
 
 public class ParserViaSourceKit: SourceParsing {
+    public func asdf(_ paths: [String],
+                     exclusionSuffixes: [String]? = nil,
+                     sema: DispatchSemaphore?,
+                     q: DispatchQueue?,
+                     completion: @escaping ([Key: Val], [Key: Val]) -> ()) {
+        if let queue = q {
+            let lock = NSLock()
+            
+            scanPaths(paths) { filePath in
+                _ = sema?.wait(timeout: DispatchTime.distantFuture)
+                queue.async {
+                    self.ff(filePath,
+                            exclusionSuffixes: exclusionSuffixes,
+                            lock: lock,
+                            completion: completion)
+                    sema?.signal()
+                }
+            }
+            
+            // Wait for queue to drain
+            queue.sync(flags: .barrier) {}
+        }
+    }
+
+  
+    public func ff(_ path: String,
+                   exclusionSuffixes: [String]? = nil,
+                   lock: NSLock?,
+                   completion: @escaping ([Key: Val], [Key: Val]) -> ()) {
+        guard path.shouldParse(with: exclusionSuffixes) else { return }
+        guard let content = FileManager.default.contents(atPath: path) else {
+            fatalError("Retrieving contents of \(path) failed")
+        }
+        
+        do {
+            var presults = [Key: Val]()
+            var kresults = [Key: Val]()
+            let topstructure = try Structure(path: path)
+            
+            for current in topstructure.substructures {
+                if current.isProtocol {
+                    var an = false
+                    if let adata = adata {
+                        let metadata = current.annotationMetadata(with: adata, in: content)
+                        an = metadata != nil
+                    }
+                    let k = current.name // Key(path: path, name: current.name)
+                    let v = Val(acl: current.accessControlLevelDescription, annotated: an, parents: [])
+                    presults[k] = v
+                    
+                } else if current.isClass {
+                    let k = current.name // Key(path: path, name: current.name)
+                    let v = Val(acl: current.accessControlLevelDescription, annotated: false, parents: current.inheritedTypes)
+                    kresults[k] = v
+                }
+            }
+            
+            lock?.lock()
+            completion(presults, kresults)
+            lock?.unlock()
+            
+        } catch {
+            fatalError(error.localizedDescription)
+        }
+    }
+    
+    //////////////////////////////
+    
+    
+    
+    
     
     public init() {}
     

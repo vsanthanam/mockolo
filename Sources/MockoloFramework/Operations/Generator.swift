@@ -85,7 +85,7 @@ public func generate(sourceDirs: [String]?,
     log("Took", t1-t0, level: .verbose)
     
     signpost_begin(name: "Generate protocol map")
-    log("Process source files and generate an annotated/protocol map...", level: .info)
+    log("11111111 Process source files and generate an annotated/protocol map...", level: .info)
     
     let paths = sourceDirs ?? sourceFiles
     let isDirs = sourceDirs != nil
@@ -171,3 +171,151 @@ public func generate(sourceDirs: [String]?,
     onCompletion(result)
 }
 
+
+//  public struct Key: Hashable {
+//      let path: String
+//      let name: String
+//  }
+
+public typealias Key = String
+public struct Val {
+    let acl: String
+    let annotated: Bool
+    let parents: [String]
+}
+  
+public let adata = "@CreateMock".data(using: String.Encoding.utf8)
+
+var pmaps = [Key: Val]()
+var kmaps = [Key: Val]()
+var rmap = [Key: [String]]()
+let pr1 = ParserViaSourceKit()
+let pr2 = ParserViaSwiftSyntax()
+let root = "/Users/ellie/uber/mirror/ios/" //"/Users/ellieshin/Developer/uber/ios"
+let depfile =  "helix-deps.txt"
+let xlist = ["TestCase", "Scene", "Screen", "Images", "Strings", "Objc", "Resources", "Mocks", "Mock", "Tests", "Test", "Drawables", "AssetCatalog", "Fixtures", "Fixture", "Model", "Models", "Service", "Services", "Generated"]
+let dirs = [root + "/libraries/foundation", root + "/libraries/common", root + "/libraries/feature", root + "/apps/iphone-helix/src/Uber"]
+
+var fcount = 1
+public func omg() {
+    let sema = DispatchSemaphore(value: 12)
+    let q = DispatchQueue(label: "qq", qos: DispatchQoS.userInteractive, attributes: DispatchQueue.Attributes.concurrent)
+
+    print("1")
+    let t0 = CFAbsoluteTimeGetCurrent()
+    pr2.asdf(dirs, exclusionSuffixes: xlist, sema: sema, q: q) { (p, k) in
+        pmaps.merge(p, uniquingKeysWith: { (l, h) -> Val in l })
+        kmaps.merge(k, uniquingKeysWith: { (l, h) -> Val in l })
+    }
+    let t1 = CFAbsoluteTimeGetCurrent()
+    
+    print("2", t1-t0)
+
+    for (k, v) in kmaps {
+        kol(key: k, val: v)
+    }
+    let t2 = CFAbsoluteTimeGetCurrent()
+    print("3", t2-t1)
+
+    let rsorted = rmap.sorted { (lhs: (key: Key, value: [String]), rhs: (key: Key, value: [String])) -> Bool in
+        return lhs.value.count < rhs.value.count
+    }
+
+    let t3 = CFAbsoluteTimeGetCurrent()
+    print("4", t3-t2)
+    let single = rsorted.filter{$0.value.count <= 1}
+    let totalAn = rsorted.filter{pmaps[$0.key]?.annotated ?? false}
+    let singleAn = single.filter{pmaps[$0.key]?.annotated ?? false}
+    let totalPublic = rsorted.filter{pmaps[$0.key]?.acl ?? "" == "public"}
+    let singlePublic = single.filter{pmaps[$0.key]?.acl ?? "" == "public"}
+    print(rsorted.count, single.count)
+    print(totalAn.count, singleAn.count)
+    print(totalPublic.count, singlePublic.count)
+    
+    
+    var liststr = ""
+    for s in single {
+        liststr.append("\n\(s.key) : \(s.value.first ?? "")")
+    }
+    
+    try? liststr.write(toFile: root + "/pkmaps\(fcount)", atomically: true, encoding: .utf8)
+    fcount += 1
+    
+//    10254 9302
+//    8875 8238
+//    4161 3463
+//
+//    10254 9302
+//    8874 8239
+//    4159 3462
+    
+//    10238 9401
+//    8883 8289
+//    4078 3467
+
+    
+    
+// TODO: #file #LOC
+
+    var singlemap = [Key: String]()
+    for ent in single {
+        if let f = ent.value.first {
+            singlemap[ent.key] = f
+        }
+    }
+    
+    // for (p, [k]) in single
+    //  if curnode is p, remove the node
+    //  if curnode is protocol and inherits p, remove decl p
+    //  if curnode is class (k) and conforms to p, remove decl p, ----------  match p's acl to k's acl
+    //  if curnode is a member (var, func, init param), replace type p with k
+    pr2.rewrite(dirs, pass: 1, with: singlemap, exclusionSuffixes: xlist) { (path, content) in
+        do {
+            try content.write(toFile: path, atomically: true, encoding: .utf8)
+        } catch {
+            fatalError(error.localizedDescription)
+        }
+    }
+
+    let t4 = CFAbsoluteTimeGetCurrent()
+    print("5", t4-t3)
+
+    pr2.rewrite(dirs, pass: 2, with: singlemap, exclusionSuffixes: xlist) { (path, content) in
+        do {
+            try content.write(toFile: path, atomically: true, encoding: .utf8)
+        } catch {
+            fatalError(error.localizedDescription)
+        }
+    }
+
+    
+    let t5 = CFAbsoluteTimeGetCurrent()
+    print("6", t5-t4)
+
+
+    // TODO:
+    // profile startup time before and after
+    // add delta to ERD
+
+    // replace pMock with kMock in tests
+    // push diff -- 1 giant diff
+}
+
+
+func kol(key: Key, val: Val) {
+//    if val.parents.isEmpty {
+//        return
+//    }
+
+    for i in val.parents {
+//        if let ent = kmaps[i] {
+//            kol(key: i, val: ent)
+//        }
+        if let ent = pmaps[i] {
+            if rmap[i] == nil {
+                rmap[i] = []
+            }
+            rmap[i]?.append(key)
+        }
+    }
+}

@@ -16,6 +16,69 @@
 
 import Foundation
 
+public var staticNumThreads: Int? = nil
+
+public func utilScan(dirs: [String],
+                     numThreads: Int? = nil,
+                     block: @escaping (_ path: String, _ lock: NSLock?) -> ()) {
+    
+    var queue: DispatchQueue?
+    var semaphore: DispatchSemaphore?
+    
+    if staticNumThreads == nil || (staticNumThreads ?? 0) > 1 {
+        let limit = staticNumThreads ?? 12
+        semaphore = DispatchSemaphore(value: limit)
+        queue = DispatchQueue(label: "dce-q", qos: DispatchQoS.userInteractive, attributes: DispatchQueue.Attributes.concurrent)
+    }
+    
+    if let queue = queue {
+        let lock = NSLock()
+        scanPaths(dirs) { filePath in
+            _ = semaphore?.wait(timeout: DispatchTime.distantFuture)
+            queue.async {
+                block(filePath, lock)
+                semaphore?.signal()
+            }
+        }
+        // Wait for queue to drain
+        queue.sync(flags: .barrier) {}
+    } else {
+        scanPaths(dirs) { filePath in
+            block(filePath, nil)
+        }
+    }
+}
+
+public func utilScan(files: [String],
+                     numThreads: Int? = nil,
+                     block: @escaping (_ path: String, _ lock: NSLock?) -> ()) {
+    
+    var queue: DispatchQueue?
+    var semaphore: DispatchSemaphore?
+    if numThreads == nil || (numThreads ?? 0) > 1 {
+        let limit = numThreads ?? 12
+        semaphore = DispatchSemaphore(value: limit)
+        queue = DispatchQueue(label: "custom-queue", qos: DispatchQoS.userInteractive, attributes: DispatchQueue.Attributes.concurrent)
+    }
+    
+    if let queue = queue {
+        let lock = NSLock()
+        for filePath in files {
+            _ = semaphore?.wait(timeout: DispatchTime.distantFuture)
+            queue.async {
+                block(filePath, lock)
+                semaphore?.signal()
+            }
+        }
+        // Wait for queue to drain
+        queue.sync(flags: .barrier) {}
+    } else {
+        for filePath in files {
+            block(filePath, nil)
+        }
+    }
+}
+
 func scanDirectory(_ path: String, with callBack: (String) -> Void) {
     let errorHandler = { (url: URL, error: Error) -> Bool in
         fatalError("Failed to traverse \(url) with error \(error).")

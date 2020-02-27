@@ -18,15 +18,34 @@
 import Foundation
 
 public enum DeclType {
-    case protocolType, classType, other
+    case protocolType, classType, extensionType, structType, enumType, typealiasType, varType, funcType, subscriptType,  other
 }
+
+
+final public class Val {
+    let path: String
+    let parents: [String]
+    let start: Int
+    let end: Int
+    var used = false
+    public init(path: String,
+                parents: [String],
+                start: Int,
+                end: Int,
+                used: Bool) {
+        self.path = path
+        self.parents = parents
+        self.start = start
+        self.end = end
+        self.used = used
+    }
+}
+
 
 public protocol SourceParsing {
     
     /// Parses processed decls (mock classes) and calls a completion block
     func parseProcessedDecls(_ paths: [String],
-                             semaphore: DispatchSemaphore?,
-                             queue: DispatchQueue?,
                              completion: @escaping ([Entity], [String: [String]]?) -> ())
     
     /// Parses decls (protocol, class) with annotation (/// @mockable) and calls a completion block
@@ -34,7 +53,5 @@ public protocol SourceParsing {
                     isDirs: Bool,
                     exclusionSuffixes: [String]?,
                     annotation: String,
-                    semaphore: DispatchSemaphore?,
-                    queue: DispatchQueue?,
                     completion: @escaping ([Entity], [String: [String]]?) -> ())
 }

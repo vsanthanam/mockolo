@@ -78,11 +78,16 @@ struct ResolvedEntityContainer {
     let imports: [(String, Data, Int64)]
 }
 
-protocol EntityNode {
+protocol EntityBase {
     var name: String { get }
+    var declType: DeclType { get }
+    var typeComponents: [String] { get }
+//    var path: String { get }
+}
+
+protocol EntityNode: EntityBase {
     var acl: String { get }
     var attributesDescription: String { get }
-    var declType: DeclType { get }
     var inheritedTypes: [String] { get }
     var offset: Int64 { get }
     var hasBlankInit: Bool { get }
@@ -122,7 +127,7 @@ public final class Entity {
     }
 
     static func node(with entityNode: EntityNode,
-                     filepath: String = "",
+                     path: String,
                      data: Data? = nil,
                      isPrivate: Bool,
                      isFinal: Bool,
@@ -132,7 +137,7 @@ public final class Entity {
         guard !isPrivate, !isFinal else {return nil}
         
         let node = Entity(entityNode: entityNode,
-                          filepath: filepath,
+                          filepath: path,
                           data: data,
                           metadata: metadata,
                           isProcessed: processed)

@@ -55,6 +55,13 @@ public struct Type {
         return sub.isSingular
     }
     
+    var base: String {
+        if isOptional || isIUO {
+            return String(typeName.dropLast(1))
+        }
+        return typeName
+    }
+    
     var underlyingType: String {
         var ret = typeName
 
@@ -455,7 +462,45 @@ public struct Type {
         return mutableArg
     }
     
+    func parseDefaultVal(isInitParam: Bool) -> String? {
+        let arg = self
+        
+        if let val = defaultSingularVal(isInitParam: isInitParam) {
+            return val
+        }
+        
+        if hasClosure {
+            return nil
+        }
 
+        if !arg.isSingular {
+            return nil
+        }
+        
+        let ret = arg.tupleComponents
+        var vals = [String]()
+        for sub in ret {
+            if sub == "," || sub == ":" || sub == "(" || sub == ")" || sub == "=" || sub == " " || sub == "" {
+                vals.append(sub)
+            } else {
+                if let val = Type(sub).defaultSingularVal(isInitParam: isInitParam) {
+                    vals.append(val)
+                } else {
+                    return nil
+                }
+            }
+        }
+        
+        if !vals.isEmpty {
+            var ret = vals.joined()
+            ret = ret.replacingOccurrences(of: ",", with: ", ")
+            ret = ret.replacingOccurrences(of: ",  ", with: ", ")
+            return ret
+        }
+        
+        return nil
+    }
+    
     static func toClosureType(with params: [Type], typeParams: [String], suffix: String, returnType: Type) -> Type {
         
         let displayableParamTypes = params.map { (subtype: Type) -> String in

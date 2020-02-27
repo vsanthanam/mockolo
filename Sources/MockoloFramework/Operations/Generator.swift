@@ -31,7 +31,7 @@ public enum ParserType {
 public func generate(sourceDirs: [String]?,
                      sourceFiles: [String]?,
                      parser: SourceParsing,
-                     exclusionSuffixes: [String],
+                     exclusionSuffixes: [String]?,
                      mockFilePaths: [String]?,
                      annotation: String,
                      header: String?,
@@ -57,7 +57,7 @@ public func generate(sourceDirs: [String]?,
     var relevantPaths = [String]()
     var resolvedEntities = [ResolvedEntity]()
     
-    let maxConcurrentThreads = concurrencyLimit ?? 0
+    let maxConcurrentThreads = concurrencyLimit ?? 1
     let sema = maxConcurrentThreads <= 1 ? nil: DispatchSemaphore(value: maxConcurrentThreads)
     let mockgenQueue = maxConcurrentThreads == 1 ? nil: DispatchQueue(label: "mockgen-q", qos: DispatchQoS.userInteractive, attributes: DispatchQueue.Attributes.concurrent)
     
@@ -65,9 +65,7 @@ public func generate(sourceDirs: [String]?,
     let t0 = CFAbsoluteTimeGetCurrent()
     log("Process input mock files...", level: .info)
     if let mockFilePaths = mockFilePaths, !mockFilePaths.isEmpty {
-        parser.parseProcessedDecls(mockFilePaths,
-                                   semaphore: sema,
-                                   queue: mockgenQueue) { (elements, imports) in
+        parser.parseProcessedDecls(mockFilePaths) { (elements, imports) in
                                     elements.forEach { element in
                                         parentMocks[element.entityNode.name] = element
                                     }
@@ -94,9 +92,7 @@ public func generate(sourceDirs: [String]?,
     parser.parseDecls(paths,
                       isDirs: isDirs,
                       exclusionSuffixes: exclusionSuffixes,
-                      annotation: annotation,
-                      semaphore: sema,
-                      queue: mockgenQueue) { (elements, imports) in
+                      annotation: annotation) { (elements, imports) in
                         elements.forEach { element in
                             protocolMap[element.entityNode.name] = element
                             if element.isAnnotated {

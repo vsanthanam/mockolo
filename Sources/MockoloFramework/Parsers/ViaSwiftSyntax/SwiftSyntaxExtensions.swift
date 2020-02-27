@@ -144,7 +144,7 @@ extension MemberDeclListItemSyntax {
         }
         return modifiers?.acl ?? ""
     }
-    
+
     func transformToModel(with encloserAcl: String, declType: DeclType, metadata: AnnotationMetadata?, processed: Bool) -> (Model, String?, Bool)? {
         if let varMember = self.decl as? VariableDeclSyntax {
             if validateMember(varMember.modifiers, declType, processed: processed) {
@@ -250,11 +250,73 @@ extension IfConfigDeclSyntax {
     }
 }
 
+extension EnumDeclSyntax: EntityBase {
+    var name: String {
+        return identifier.text.trimmingCharacters(in: .whitespaces)
+    }
+    var declType: DeclType {
+        return .enumType
+    }
+    var typeComponents: [String] {
+        return inheritanceClause?.types ?? []
+    }
+}
+
+extension StructDeclSyntax: EntityBase {
+    var name: String {
+        return identifier.text.trimmingCharacters(in: .whitespaces)
+    }
+    var declType: DeclType {
+        return .structType
+    }
+
+    var typeComponents: [String] {
+        return inheritanceClause?.types ?? []
+    }
+}
+
+extension TypealiasDeclSyntax: EntityBase {
+    var name: String {
+        return identifier.text.trimmingCharacters(in: .whitespaces)
+    }
+    var declType: DeclType {
+        return .typealiasType
+    }
+    var typeComponents: [String] {
+        return initializer?.value.tokens.userDefinedTypes ?? []
+    }
+}
+
+extension ExtensionDeclSyntax: EntityBase {
+    var name: String {
+        return extendedType.description.trimmingCharacters(in: .whitespaces)
+    }
+    var declType: DeclType {
+        return .extensionType
+    }
+
+    var typeComponents: [String] {
+        return [inheritedTypes, genericTypes].flatMap{$0}
+    }
+
+    var genericTypes: [String] {
+        return genericWhereClause?.tokens.userDefinedTypes ?? []
+    }
+
+    var inheritedTypes: [String] {
+        return inheritanceClause?.types ?? []
+    }
+}
+
 extension ProtocolDeclSyntax: EntityNode {
     var name: String {
-        return identifier.text
+        return identifier.text.trimmingCharacters(in: .whitespaces)
     }
-    
+
+    var typeComponents: [String] {
+        return [inheritedTypes, genericTypes].flatMap{$0}
+    }
+
     var acl: String {
         return self.modifiers?.acl ?? ""
     }
@@ -270,7 +332,11 @@ extension ProtocolDeclSyntax: EntityNode {
     var inheritedTypes: [String] {
         return inheritanceClause?.types ?? []
     }
-    
+
+    var genericTypes: [String] {
+        return genericWhereClause?.tokens.userDefinedTypes ?? []
+    }
+
     var attributesDescription: String {
         self.attributes?.trimmedDescription ?? ""
     }
@@ -293,11 +359,14 @@ extension ProtocolDeclSyntax: EntityNode {
 }
 
 extension ClassDeclSyntax: EntityNode {
-    
     var name: String {
-        return identifier.text
+        return identifier.text.trimmingCharacters(in: .whitespaces)
     }
-    
+
+    var typeComponents: [String] {
+        return [inheritedTypes, genericTypes].flatMap{$0}
+    }
+
     var acl: String {
         return self.modifiers?.acl ?? ""
     }
@@ -309,7 +378,11 @@ extension ClassDeclSyntax: EntityNode {
     var inheritedTypes: [String] {
         return inheritanceClause?.types ?? []
     }
-    
+
+    var genericTypes: [String] {
+        return [genericParameterClause?.tokens.userDefinedTypes, genericWhereClause?.tokens.userDefinedTypes].compactMap{$0}.flatMap{$0}
+    }
+
     var attributesDescription: String {
         self.attributes?.trimmedDescription ?? ""
     }
@@ -343,7 +416,22 @@ extension ClassDeclSyntax: EntityNode {
     }
 }
 
-extension VariableDeclSyntax {
+extension VariableDeclSyntax: EntityBase {
+    var name: String {
+        let ret = bindings.compactMap { $0.pattern.firstToken?.text }
+        if let first = ret.first {
+            return first
+        }
+        return .unknownVal
+    }
+    var declType: DeclType {
+        return .varType
+    }
+    var typeComponents: [String] {
+        let ret = bindings.compactMap { $0.typeAnnotation?.type.tokens.userDefinedTypes }
+        return ret.flatMap{$0}
+    }
+
     func models(with acl: String, declType: DeclType, overrides: [String: String]?, processed: Bool) -> [Model] {
         // Detect whether it's static
         var isStatic = false
@@ -380,7 +468,23 @@ extension VariableDeclSyntax {
     }
 }
 
-extension SubscriptDeclSyntax {
+extension SubscriptDeclSyntax: EntityBase {
+    var name: String {
+        return self.subscriptKeyword.text
+    }
+    var declType: DeclType {
+        return .subscriptType
+    }
+    var typeComponents: [String] {
+        var ret = genericTypes
+        ret.append(result.returnType.description)
+        return ret
+    }
+
+    var genericTypes: [String] {
+        return genericParameterClause?.genericParameterList.tokens.userDefinedTypes ?? []
+    }
+
     func model(with acl: String, declType: DeclType, processed: Bool) -> Model {
         var isStatic = false
         if let modifiers = self.modifiers {
@@ -407,8 +511,31 @@ extension SubscriptDeclSyntax {
     }
 }
 
-extension FunctionDeclSyntax {
-    
+extension FunctionDeclSyntax: EntityBase {
+    var name: String {
+        return self.identifier.description.trimmingCharacters(in: .whitespaces)
+    }
+    var declType: DeclType {
+        return .funcType
+    }
+    var typeComponents: [String] {
+        var ret = genericTypes
+        ret.append(contentsOf: paramTypes)
+        if let t = signature.output?.returnType.description {
+            ret.append(t)
+        }
+        return ret
+    }
+
+    var genericTypes: [String] {
+        return [genericParameterClause?.genericParameterList.tokens.userDefinedTypes,
+                genericWhereClause?.tokens.userDefinedTypes].compactMap{$0}.flatMap{$0}
+    }
+
+    var paramTypes: [String] {
+        return signature.input.parameterList.tokens.userDefinedTypes
+    }
+
     func model(with acl: String, declType: DeclType, processed: Bool) -> Model {
         var isStatic = false
         if let modifiers = self.modifiers {
@@ -557,6 +684,7 @@ extension TypealiasDeclSyntax {
                               modelDescription: self.description,
                               useDescription: true,
                               processed: processed)
+
     }
 }
 
@@ -564,7 +692,9 @@ final class EntityVisitor: SyntaxVisitor {
     var entities: [Entity] = []
     var imports: [String] = []
     let annotation: String
-    init(annotation: String = "") {
+    let path: String
+    init(_ path: String, annotation: String = "") {
+        self.path = path
         self.annotation = annotation
     }
     
@@ -575,7 +705,7 @@ final class EntityVisitor: SyntaxVisitor {
     
     func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
         let metadata = node.annotationMetadata(with: annotation)
-        if let ent = Entity.node(with: node, isPrivate: node.isPrivate, isFinal: false, metadata: metadata, processed: false) {
+        if let ent = Entity.node(with: node, path: path, isPrivate: node.isPrivate, isFinal: false, metadata: metadata, processed: false) {
             entities.append(ent)
         }
         return .skipChildren
@@ -584,12 +714,12 @@ final class EntityVisitor: SyntaxVisitor {
     func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
         if node.name.hasSuffix("Mock") {
             // this mock class node must be public else wouldn't have compiled before
-            if let ent = Entity.node(with: node, isPrivate: node.isPrivate, isFinal: false, metadata: nil, processed: true) {
+            if let ent = Entity.node(with: node, path: path, isPrivate: node.isPrivate, isFinal: false, metadata: nil, processed: true) {
                 entities.append(ent)
             }
         } else {
             let metadata = node.annotationMetadata(with: annotation)
-            if let ent = Entity.node(with: node, isPrivate: node.isPrivate, isFinal: node.isFinal, metadata: metadata, processed: false) {
+            if let ent = Entity.node(with: node, path: path, isPrivate: node.isPrivate, isFinal: node.isFinal, metadata: metadata, processed: false) {
                 entities.append(ent)
             }
         }
@@ -673,4 +803,237 @@ extension Trivia {
     }
 }
 
+extension TokenSyntax {
+    var stringToken: String? {
+        return text.isAlphanumeric ? text : nil
+    }
 
+    var userDefinedType: String? {
+        guard !self.text.contains("-"), !self.text.contains(","), !self.text.contains(" ")  else {return nil}
+        var typename = self.text
+        let isType = typename.first?.isUppercase ?? false
+        
+        // If no default val found, it's potentially used, so add it to used types
+        if isType {
+            if text.contains("Mock"), let t = text.components(separatedBy: "Mock").first {
+                typename = t
+            } else if let _ = Type(typename).defaultSingularVal(isInitParam: false) {
+                return nil
+            }
+            return typename
+        }
+        return nil
+    }
+}
+
+extension TokenSequence {
+    var tokenList: [String] {
+        let ret = self.compactMap { $0.stringToken }
+        return ret
+    }
+    var userDefinedTypes: [String] {
+        let ret = self.compactMap { $0.userDefinedType }
+        return ret
+    }
+}
+
+
+
+// MARK - used for cleanup
+
+final class CleanerVisitor: SyntaxVisitor {
+    let annotation: String
+    let pass: Int
+    let root: SourceFileSyntax
+    let path: String
+    let converter: SourceLocationConverter
+    let charset: CharacterSet
+    var usedTypes = [String]()
+    var protocolMap = [String: Entry]()
+    
+    init(annotation: String, path: String, root: SourceFileSyntax) {
+        self.annotation = annotation
+        self.path = path
+        self.root = root
+        self.converter = SourceLocationConverter(file: path, tree: root)
+        self.pass = annotation.isEmpty ? 1 : 0
+        self.charset = CharacterSet(arrayLiteral: "!", "?").union(.whitespaces)
+    }
+    
+    func reset() {
+        usedTypes.removeAll()
+        protocolMap.removeAll()
+    }
+
+    func visit(_ node: CodeBlockItemSyntax) -> SyntaxVisitorContinueKind {
+        if pass == 1 {
+            if let item = node.item as? ClassDeclSyntax {
+                let ret = [item.inheritanceClause?.inheritedTypeCollection.tokens.userDefinedTypes,
+                           item.genericParameterClause?.tokens.userDefinedTypes,
+                           item.genericWhereClause?.tokens.userDefinedTypes,
+                           item.members.tokens.userDefinedTypes].compactMap{$0}.flatMap{$0}
+                
+                usedTypes.append(contentsOf: ret)
+                return .skipChildren
+            }
+        }
+        if pass == 0 {
+            
+            if let item = node.item as? ProtocolDeclSyntax {
+                let metadata = item.annotationMetadata(with: annotation)
+                var docloc = (0, 0)
+                if metadata != nil {
+                    let loc = node.startLocation(converter: converter)
+                    if let l = loc.line, let c = loc.column {
+                        let pos = converter.position(ofLine: l, column: c)
+                        if let len = node.leadingTrivia?.sourceLength {
+                            let end = pos.utf8Offset
+                            let start = end - len.utf8Length
+                            docloc = (start, end)
+                        }
+                    }
+                }
+                
+                let parents = item.inheritedTypes.filter{$0 != "AnyObject" && $0 != "class" && $0 != "Any"}
+                protocolMap[item.name] = Entry(path: path, module: path.module, parents: parents, annotated: metadata != nil, docLoc: docloc)
+                
+                
+                let ret = [item.inheritanceClause?.inheritedTypeCollection.tokens.userDefinedTypes,
+                           item.genericWhereClause?.tokens.userDefinedTypes,
+                           item.members.tokens.userDefinedTypes].compactMap{$0}.flatMap{$0}
+                usedTypes.append(contentsOf: ret)
+                
+                return .skipChildren
+            }
+            
+            if let item = node.item as? ExtensionDeclSyntax {
+                let ret = [item.inheritanceClause?.inheritedTypeCollection.tokens.userDefinedTypes,
+                           item.genericWhereClause?.tokens.userDefinedTypes,
+                           item.members.tokens.userDefinedTypes].compactMap{$0}.flatMap{$0}
+                usedTypes.append(contentsOf: ret)
+                return .skipChildren
+            }
+        }
+        
+        if pass == 1 {
+            let ret = node.item.tokens.userDefinedTypes
+            usedTypes.append(contentsOf: ret)
+            return .skipChildren
+        }
+        
+        return .visitChildren
+    }
+}
+
+
+struct DeclKey: Hashable {
+    let name: String
+    //    let path: String
+    //
+    //    func hash(into hasher: inout Hasher) {
+    //        hasher.combine(name)
+    //        hasher.combine(path)
+    //    }
+}
+
+final class DeclVisitor: SyntaxVisitor {
+    var declMap = [String: [String]]()
+    var path: String
+    var module: String
+    init(_ path: String) {
+        self.path = path
+        // TODO: need to get modules as input to handle smth like ConversationalAiGRPC
+        if path.module.isEmpty {
+            self.module = path
+        } else {
+            self.module = path.module
+        }
+    }
+
+    func visit(_ node: CodeBlockItemSyntax) -> SyntaxVisitorContinueKind {
+
+        if let item = node.item as? EntityBase {
+            if declMap[item.name] == nil {
+                declMap[item.name] = []
+            }
+
+            // TODO: for all decls, add if non-private
+            declMap[item.name]?.append(module)
+        }
+        return .skipChildren
+    }
+}
+
+
+
+final class RefVisitor: SyntaxVisitor {
+    var imports = [String]()
+    var refs = [String]()
+    var path: String
+    var module: String
+    init(_ path: String) {
+        self.path = path
+        self.module = path.module
+    }
+    func visit(_ node: CodeBlockItemSyntax) -> SyntaxVisitorContinueKind {
+        if let item = node.item as? ImportDeclSyntax {
+            if item.attributes == nil, item.importKind == nil {
+                let str = item.path.description.trimmingCharacters(in: .whitespaces)
+                imports.append(str)
+            }
+        } else {
+            // TODO: use FunctionCallExpr VarCallExpr instead of tokens
+            refs.append(contentsOf: node.tokens.tokenList)
+        }
+        return .skipChildren
+    }
+}
+
+public final class ImportRemover: SyntaxRewriter {
+    let unused: [String]
+    public init(_ path: String, unusedModules: [String]?) {
+        self.unused = unusedModules ?? []
+    }
+    override public func visit(_ node: ImportDeclSyntax) -> DeclSyntax {
+        var remove = false
+        let str = node.path.description.trimmingCharacters(in: .whitespaces)
+        if unused.contains(str) {
+            remove = true
+        } else {
+            for t in node.path.tokens {
+                if unused.contains(t.text) {
+                    remove = true
+                }
+            }
+        }
+
+        if remove {
+            if let trivia = node.importTok.leadingTrivia {
+                let t = SyntaxFactory.makeUnknown("", leadingTrivia: trivia, trailingTrivia: Trivia(pieces: []))
+                return SyntaxFactory.makeImportDecl(attributes: nil, modifiers: nil, importTok: t, importKind: nil, path: SyntaxFactory.makeAccessPath([]))
+            } else {
+                return SyntaxFactory.makeBlankImportDecl()
+            }
+        }
+
+        return super.visit(node)
+    }
+}
+
+
+public final class CleanerWriter: SyntaxRewriter {
+    var k = 0
+    var p = 0
+    public func reset() {
+        k = 0
+        p = 0
+    }
+    override public func visit(_ node: ProtocolDeclSyntax) -> DeclSyntax {
+        p += 1
+        return super.visit(node)
+    }
+    override public func visit(_ node: ClassDeclSyntax) -> DeclSyntax {
+        k += 1
+        return super.visit(node)
+    }
+}

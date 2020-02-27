@@ -22,12 +22,9 @@ public class ParserViaSwiftSyntax: SourceParsing {
     public init() {}
     
     public func parseProcessedDecls(_ paths: [String],
-                                    semaphore: DispatchSemaphore?,
-                                    queue: DispatchQueue?,
                                     completion: @escaping ([Entity], [String: [String]]?) -> ()) {
-        var treeVisitor = EntityVisitor()
-        for filePath in paths {
-            generateASTs(filePath, annotation: "", treeVisitor: &treeVisitor, completion: completion)
+        utilScan(files: paths) { (path, lock) in
+            self.generateASTs(path, annotation: "", lock: lock, completion: completion)
         }
     }
     
@@ -35,52 +32,184 @@ public class ParserViaSwiftSyntax: SourceParsing {
                            isDirs: Bool,
                            exclusionSuffixes: [String]? = nil,
                            annotation: String,
-                           semaphore: DispatchSemaphore?,
-                           queue: DispatchQueue?,
                            completion: @escaping ([Entity], [String: [String]]?) -> ()) {
         
         guard let paths = paths else { return }
-        
-        var treeVisitor = EntityVisitor(annotation: annotation)
-        
+
         if isDirs {
-            scanPaths(paths) { filePath in
-                generateASTs(filePath,
+            utilScan(dirs: paths) { (path, lock) in
+                self.generateASTs(path,
                              exclusionSuffixes: exclusionSuffixes,
                              annotation: annotation,
-                             treeVisitor: &treeVisitor,
+                             lock: lock,
                              completion: completion)
             }
         } else {
-            for filePath in paths {
-                generateASTs(filePath, exclusionSuffixes: exclusionSuffixes, annotation: annotation, treeVisitor: &treeVisitor, completion: completion)
+            utilScan(files: paths) { (path, lock) in
+                self.generateASTs(path,
+                                  exclusionSuffixes: exclusionSuffixes,
+                                  annotation: annotation,
+                                  lock: lock,
+                                  completion: completion)
             }
-            
         }
     }
     
     private func generateASTs(_ path: String,
                               exclusionSuffixes: [String]? = nil,
                               annotation: String,
-                              treeVisitor: inout EntityVisitor,
+                              lock: NSLock?,
                               completion: @escaping ([Entity], [String: [String]]?) -> ()) {
         
         guard path.shouldParse(with: exclusionSuffixes) else { return }
         do {
             var results = [Entity]()
             let node = try SyntaxParser.parse(path)
+            var treeVisitor = EntityVisitor(path, annotation: annotation)
             node.walk(&treeVisitor)
             let ret = treeVisitor.entities
-            for ent in ret {
-                ent.filepath = path
-            }
             results.append(contentsOf: ret)
             let imports = treeVisitor.imports
-            treeVisitor.reset()
-            
+
+            lock?.lock()
+            defer {lock?.unlock()}
             completion(results, [path: imports])
+            treeVisitor.reset()
         } catch {
             fatalError(error.localizedDescription)
         }
+    }
+
+    public func scanMockables(dirs: [String],
+                              exclusionSuffixes: [String]?,
+                              annotation: String,
+                              completion: @escaping (String, [String], [String: Entry]) -> ()) {
+        utilScan(dirs: dirs) { (path, lock) in
+            guard !path.contains("___"), path.shouldParse(with: exclusionSuffixes) else { return }
+            
+            do {
+                let node = try SyntaxParser.parse(path)
+                var visitor = CleanerVisitor(annotation: annotation, path: path, root: node)
+                node.walk(&visitor)
+                lock?.lock()
+                defer {lock?.unlock()}
+                completion(path, visitor.usedTypes, visitor.protocolMap)
+                visitor.reset()
+            } catch {
+                fatalError(error.localizedDescription)
+            }
+        }
+    }
+    
+    func scanUsedTypes(dirs: [String],
+                       exclusionSuffixes: [String]?,
+                       completion: @escaping (String, [String]) -> ()) {
+        
+        utilScan(dirs: dirs) { (path, lock) in
+            guard !path.contains("___"),
+                path.hasSuffix(".swift"),
+                (path.contains("Test") || path.contains("Mocks.swift") || path.contains("Mock.swift")) else { return }
+            
+            do {
+                let node = try SyntaxParser.parse(path)
+                var visitor = CleanerVisitor(annotation: "", path: path, root: node)
+                node.walk(&visitor)
+                lock?.lock()
+                defer {lock?.unlock()}
+                
+                completion(path, visitor.usedTypes.filter{!$0.isEmpty})
+                visitor.reset()
+            } catch {
+                fatalError(error.localizedDescription)
+            }
+        }
+    }
+    
+    
+    public func stats(dirs: [String],
+                      exclusionSuffixes: [String]? = nil,
+                      numThreads: Int? = nil,
+                      completion: @escaping (Int, Int) -> ()) {
+        utilScan(dirs: dirs) { (path: String, lock: NSLock?) in
+            guard path.shouldParse(with: exclusionSuffixes) else {return}
+            do {
+                let node = try SyntaxParser.parse(path)
+                let rewriter = CleanerWriter()
+                _ = rewriter.visit(node)
+                
+                lock?.lock()
+                defer {lock?.unlock()}
+                completion(rewriter.k, rewriter.p)
+            } catch {
+                fatalError()
+            }
+        }
+    }
+    
+    
+    func scanDecls(dirs: [String],
+                   exclusionSuffixes: [String]? = nil,
+                   completion: @escaping (String, [String: [String]]) -> ()) {
+        utilScan(dirs: dirs) { (path: String, lock: NSLock?) in
+            guard path.shouldParse(with: exclusionSuffixes) else { return }
+            do {
+                var k = 0
+                let node = try SyntaxParser.parse(path)
+                var visitor = DeclVisitor(path)
+                node.walk(&visitor)
+                
+                lock?.lock()
+                defer {lock?.unlock()}
+                completion(path, visitor.declMap)
+            } catch {
+                fatalError(error.localizedDescription)
+            }
+        }
+    }
+
+    func scanRefs(dirs: [String],
+                   exclusionSuffixes: [String]? = nil,
+                   completion: @escaping (String, [String], [String]) -> ()) {
+        utilScan(dirs: dirs) { (path: String, lock: NSLock?) in
+            guard path.shouldParse(with: exclusionSuffixes) else { return }
+            do {
+//                var results = [String: Val]()
+//                var k = 0
+                let node = try SyntaxParser.parse(path)
+                var visitor = RefVisitor(path)
+                node.walk(&visitor)
+
+                lock?.lock()
+                completion(path, visitor.refs, visitor.imports)
+                lock?.unlock()
+            } catch {
+                fatalError(error.localizedDescription)
+            }
+        }
+    }
+
+    func removeUnusedImports(dirs: [String],
+                             exclusionSuffixes: [String]? = nil,
+                             unusedImports: [String: [String]],
+                             completion: @escaping (String, String) -> ()) {
+
+        utilScan(dirs: dirs) { (path, lock) in
+            guard path.shouldParse(with: exclusionSuffixes) else { return }
+                        do {
+            //                var results = [String: Val]()
+            //                var k = 0
+                            let node = try SyntaxParser.parse(path)
+                            var remover = ImportRemover(path, unusedModules: unusedImports[path])
+                            let ret = remover.visit(node)
+
+                            lock?.lock()
+                            completion(path, ret.description)
+                            lock?.unlock()
+                        } catch {
+                            fatalError(error.localizedDescription)
+                        }
+
+        }
+
     }
 }

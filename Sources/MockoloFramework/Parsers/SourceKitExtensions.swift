@@ -19,7 +19,6 @@ import SourceKittenFramework
 
 
 extension Structure: EntityNode {
-    
     init(path: String) throws {
         self.init(sourceKitResponse: try Request.customRequest(request: [
             "key.request": UID("source.request.editor.open"),
@@ -189,7 +188,9 @@ extension Structure: EntityNode {
         // A type must have a name.
         return dictionary["key.name"] as? String ?? .unknownVal
     }
-    
+    var typeComponents: [String] {
+        return typeName.typeComponents
+    }
     var kind: String {
         return dictionary["key.kind"] as? String ?? .unknownVal
     }
@@ -211,7 +212,15 @@ extension Structure: EntityNode {
         }
         return .unknownVal
     }
-    
+
+    var isPublic: Bool {
+        return accessControlLevel == "public" ||
+            accessControlLevel == "open"
+    }
+    var isInternal: Bool {
+        return accessControlLevel == "internal"
+    }
+
     var isPrivate: Bool {
         if let attrs = attributeValues {
             return attrs.contains(SwiftDeclarationAttributeKind.private.rawValue) || attrs.contains(SwiftDeclarationAttributeKind.fileprivate.rawValue)
@@ -219,6 +228,7 @@ extension Structure: EntityNode {
         
         return false
     }
+    
     var isFinal: Bool {
         return attributeValues?.contains(SwiftDeclarationAttributeKind.final.rawValue) ?? false
     }
@@ -270,7 +280,10 @@ extension Structure: EntityNode {
     var isClass: Bool {
         return kind == SwiftDeclarationKind.class.rawValue
     }
-    
+    var isExtension: Bool {
+        return kind == SwiftDeclarationKind.extension.rawValue
+    }
+
     var isVariable: Bool {
         return isStaticVariable || isInstanceVariable
     }
@@ -328,7 +341,21 @@ extension Structure: EntityNode {
     var attributeValues: [String]? {
         return attributes?.compactMap { $0["key.attribute"] as? String}
     }
-    
+
+    var startOffset: Int {
+        var start = offset
+        if docOffset > 0, docOffset < start {
+            start = docOffset
+        } else if range.offset > 0, range.offset < start {
+            start = range.offset
+        }
+        return Int(start)
+    }
+
+    var endOffset: Int {
+        return Int(offset + length)
+    }
+
     var range: (offset: Int64, length: Int64) {
         var offsetMin: Int64 = .max
         var offsetMax: Int64 = -1

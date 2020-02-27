@@ -22,6 +22,7 @@ class Executor {
     let defaultTimeout = 20
     
     // MARK: - Private
+    private var shouldClean: OptionArgument<Bool>!
     private var loggingLevel: OptionArgument<Int>!
     private var outputFilePath: OptionArgument<String>!
     private var mockFilePaths: OptionArgument<[String]>!
@@ -61,20 +62,20 @@ class Executor {
                                  usage: "List of source files (separated by a comma or a space) to generate mocks for. If the --sourcedirs or --filelist value exists, this will be ignored. ",
                                  completion: .filename)
         sourceFileList = parser.add(option: "--filelist",
-                                 shortName: "-f",
-                                 kind: String.self,
-                                 usage: "Path to a file containing a list of source file paths (delimited by a new line). If the --sourcedirs value exists, this will be ignored. ",
-                                 completion: .filename)
+                                    shortName: "-f",
+                                    kind: String.self,
+                                    usage: "Path to a file containing a list of source file paths (delimited by a new line). If the --sourcedirs value exists, this will be ignored. ",
+                                    completion: .filename)
         sourceDirs = parser.add(option: "--sourcedirs",
                                 shortName: "-s",
                                 kind: [String].self,
                                 usage: "Paths to the directories containing source files to generate mocks for. If the --filelist or --sourcefiles values exist, they will be ignored. ",
                                 completion: .filename)
         depFileList = parser.add(option: "--depfilelist",
-                                   shortName: "-deplist",
-                                   kind: String.self,
-                                   usage: "Path to a file containing a list of dependent files (separated by a new line) from modules this target depends on. ",
-                                   completion: .filename)
+                                 shortName: "-deplist",
+                                 kind: String.self,
+                                 usage: "Path to a file containing a list of dependent files (separated by a new line) from modules this target depends on. ",
+                                 completion: .filename)
         mockFilePaths = parser.add(option: "--mockfiles",
                                    shortName: "-mocks",
                                    kind: [String].self,
@@ -110,80 +111,131 @@ class Executor {
                                       kind: Int.self,
                                       usage: "Maximum number of threads to execute concurrently (default = number of cores on the running machine).")
         useSourceKit = parser.add(option: "--use-sourcekit",
-                             kind: Bool.self,
-                             usage: "Whether to use SourceKit for parsing. By default it will use SwiftSyntax.")
-    }
-    
-    private func fullPath(_ path: String) -> String {
-        if path.hasPrefix("/") {
-            return path
-        }
-        if path.hasPrefix("~") {
-            let home = FileManager.default.homeDirectoryForCurrentUser.path
-            return path.replacingOccurrences(of: "~", with: home, range: path.range(of: "~"))
-        }
-        return FileManager.default.currentDirectoryPath + "/" + path
+                                  kind: Bool.self,
+                                  usage: "Whether to use SourceKit for parsing. By default it will use SwiftSyntax.")
+        shouldClean = parser.add(option: "--clean",
+                                 shortName: "-c",
+                                 kind: Bool.self,
+                                 usage: "Whether to clean up unused annotations.")
     }
     
     /// Execute the command.
     ///
     /// - parameter arguments: The command line arguments to execute the command with.
     func execute(with arguments: ArgumentParser.Result) {
-      
-        guard let outputArg = arguments.get(outputFilePath) else { fatalError("Missing destination file path") }
-        let outputFilePath = fullPath(outputArg)
-
-        let srcDirs = arguments.get(sourceDirs)?.map(fullPath)
-        var srcs: [String]?
-        // If source file list exists, source files value will be overriden (see the usage in setupArguments above)
-        if let srcList = arguments.get(sourceFileList) {
-            let text = try? String(contentsOfFile: srcList, encoding: String.Encoding.utf8)
-            srcs = text?.components(separatedBy: "\n").filter{!$0.isEmpty}.map(fullPath)
-        } else {
-            srcs = arguments.get(sourceFiles)?.map(fullPath)
-        }
-
-        if srcDirs == nil, srcs == nil {
-            fatalError("Missing source files or directories")
-        }
         
-        var mockFilePaths: [String]?
-        // If dep file list exists, mock filepaths value will be overriden (see the usage in setupArguments above)
-        if let depList = arguments.get(self.depFileList) {
-            let text = try? String(contentsOfFile: depList, encoding: String.Encoding.utf8)
-            mockFilePaths = text?.components(separatedBy: "\n").filter{!$0.isEmpty}.map(fullPath)
+        let root1 =  "/Users/ellieshin/uber/mirror/ios" // "/Users/ellie/uber/mirror/ios"
+        let root =  "/Users/ellieshin/uber/ios" // "/Users/ellie/uber/mirror/ios"
+        let f1 = root + "/apps"
+        let f2 = root + "/libraries"
+        let f3 = root + "/libraries/foundation/Presidio"
+        let f4 = root + "/libraries/foundation/PresidioFoundation/"
+        let f5 = root + "/libraries/foundation/PresidioUtilities/"
+        let f6 = root + "/libraries/foundation/Experimentation/"
+        let dirs = [f1, f2]
+        let op = root + "/import-results"
+        let climit = 12
+
+        
+        let x = -1
+        if x == -1 {
+//            let dirs = ["/Users/ellieshin/Developer/mockolo/Samples"]
+//            staticNumThreads = 1
+            let xlist = "Mock Mocks main Fixtures Fixture Scene".components(separatedBy: " ")
+            dceImports(sourceDirs: dirs,
+                       exclusionSuffixes: xlist,
+                       exclusionSuffixesForUsed: nil,
+                       outputFilePath: op,
+                       concurrencyLimit: climit)
+        } else if x == 0 {
+            let xlist = "Images Strings Responses Mock Mocks Screen Screens main Services Service Fixtures Fixture Scene Model Models Exceptions Standin Standins".components(separatedBy: " ")
+            let xlist2 = "Images Strings Mock Mocks main Fixtures Fixture Scene Standin Standins".components(separatedBy: " ")
+            dce(sourceDirs: dirs,
+                exclusionSuffixes: xlist2,
+                exclusionSuffixesForUsed: nil,
+                outputFilePath: op,
+                concurrencyLimit: climit)
+            // multi
+            // 22953, 30020, 6191  // 22955, 30026, 6192, // 22955, 30028, 6192, // 22954, 30022, 6192,
+            // 22775, 29855, 6196, // 22773, 29856, 6196, // 22775, 29857, 6195, // 22772, 29855, 6195,
+
+
+            // single
+            // 22955, 30029, 6192,
+            // 22775, 29862, 6196
+            // p: -180, k: -167, LoC: 5K
+
+            // tests
+            // 11, 12179, 354,  // 11, 12180, 354,
+            // 11, 12115, 349,  // 11, 12117, 349,
+            // p: 0, k: -64, e: -5
+        } else if x == 1 { //let _ = cleanFlag {
+//            let dirs = ["/Users/ellie/Developer/mockolo/Samples"]
+//            staticNumThreads = 1
+            let xlist = "Images Strings Responses Mock Mocks Screen Screens main Services Service Fixtures Fixture Scene Model Models Exceptions Standin Standins".components(separatedBy: " ")
+            cleanup(sourceDirs: dirs,
+                    exclusionSuffixes: xlist,
+                    annotation: "@CreateMock",
+                    outputFilePath: op,
+                    concurrencyLimit: climit)
         } else {
-             mockFilePaths = arguments.get(self.mockFilePaths)?.map(fullPath)
-        }
+            
+            let cleanFlag = arguments.get(shouldClean)
+            let outputfile = arguments.get(outputFilePath)?.fullPath
+            let srcDirs = arguments.get(sourceDirs)?.map{$0.fullPath}
+            let concurrencyLimit = arguments.get(self.concurrencyLimit)
+            let exclusionSuffixes = arguments.get(self.exclusionSuffixes)
+            let annotation = arguments.get(self.annotation) ?? String.mockAnnotation
 
-        let concurrencyLimit = arguments.get(self.concurrencyLimit)
-        let exclusionSuffixes = arguments.get(self.exclusionSuffixes) ?? []
-        let annotation = arguments.get(self.annotation) ?? String.mockAnnotation
-        let header = arguments.get(self.header)
-        let loggingLevel = arguments.get(self.loggingLevel) ?? 0
-        let macro = arguments.get(self.macro)
-        let testableImports = arguments.get(self.testableImports)
-        let shouldUseSourceKit = arguments.get(useSourceKit) ?? false
+            guard let outputPath = outputfile else { fatalError("Missing destination file path") }
+            var srcs: [String]?
+            // If source file list exists, source files value will be overriden (see the usage in setupArguments above)
+            if let srcList = arguments.get(sourceFileList) {
+                let text = try? String(contentsOfFile: srcList, encoding: String.Encoding.utf8)
+                srcs = text?.components(separatedBy: "\n").filter{!$0.isEmpty}.map{$0.fullPath}
+            } else {
+                srcs = arguments.get(sourceFiles)?.map{$0.fullPath}
+            }
+            
+            if srcDirs == nil, srcs == nil {
+                fatalError("Missing source files or directories")
+            }
+            
+            var mockFilePaths: [String]?
+            // If dep file list exists, mock filepaths value will be overriden (see the usage in setupArguments above)
+            if let depList = arguments.get(self.depFileList) {
+                let text = try? String(contentsOfFile: depList, encoding: String.Encoding.utf8)
+                mockFilePaths = text?.components(separatedBy: "\n").filter{!$0.isEmpty}.map{$0.fullPath}
+            } else {
+                mockFilePaths = arguments.get(self.mockFilePaths)?.map{$0.fullPath}
+            }
+            
+            let header = arguments.get(self.header)
+            let loggingLevel = arguments.get(self.loggingLevel) ?? 0
+            let macro = arguments.get(self.macro)
+            let shouldUseSourceKit = arguments.get(useSourceKit) ?? false
+            let testableImportList = arguments.get(testableImports)
 
-        do {
-            try generate(sourceDirs: srcDirs,
-                         sourceFiles: srcs,
-                         parser: shouldUseSourceKit ? ParserViaSourceKit() : ParserViaSwiftSyntax(),
-                         exclusionSuffixes: exclusionSuffixes,
-                         mockFilePaths: mockFilePaths,
-                         annotation: annotation,
-                         header: header,
-                         macro: macro,
-                         testableImports: testableImports,
-                         to: outputFilePath,
-                         loggingLevel: loggingLevel,
-                         concurrencyLimit: concurrencyLimit,
-                         onCompletion: { _ in
-                    log("Done. Exiting program.", level: .info)
-                    exit(0)
-            })
-        } catch {
-            fatalError("Generation error: \(error)")
+            do {
+                try generate(sourceDirs: srcDirs,
+                             sourceFiles: srcs,
+                             parser: shouldUseSourceKit ? ParserViaSourceKit() : ParserViaSwiftSyntax(),
+                             exclusionSuffixes: exclusionSuffixes,
+                             mockFilePaths: mockFilePaths,
+                             annotation: annotation,
+                             header: header,
+                             macro: macro,
+                             testableImports: testableImportList,
+                             to: outputPath,
+                             loggingLevel: loggingLevel,
+                             concurrencyLimit: concurrencyLimit,
+                             onCompletion: { _ in
+                                log("Done. Exiting program.", level: .info)
+                                exit(0)
+                })
+            } catch {
+                fatalError("Generation error: \(error)")
+            }
         }
     }
 }

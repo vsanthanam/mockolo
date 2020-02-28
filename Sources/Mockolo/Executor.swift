@@ -129,7 +129,16 @@ class Executor {
     ///
     /// - parameter arguments: The command line arguments to execute the command with.
     func execute(with arguments: ArgumentParser.Result) {
-      
+       
+//        let x = SimpleVarMock(klass: Klass())
+//        print(x.klassSetCallCount)
+//
+//        let y = SimpleVarMock()
+//        y.klass = Klass()
+//        y.underlyingKlass = Klass()
+//        print(y.klassSetCallCount)
+
+        
         guard let outputArg = arguments.get(outputFilePath) else { fatalError("Missing destination file path") }
         let outputFilePath = fullPath(outputArg)
 
@@ -187,3 +196,180 @@ class Executor {
         }
     }
 }
+
+
+#if MOCK
+
+/// \(String.mockAnnotation)
+@objc
+public protocol SimpleVar {
+    @objc var name: Int { get set }
+    @objc var klass: Klass { get set }
+}
+
+
+public class SimpleVarMock: SimpleVar {
+
+    private var _doneInit = false
+
+    public init() { _doneInit = true }
+    public init(name: Int = 0, klass: Klass) {
+        self.name = name
+        self.klass = klass
+        _doneInit = true
+    }
+
+    @Mockable public var name: Int = 0
+    public var nameSetCallCount: Int { self._name.setCallCount }
+
+    @MockObservable public var nameStream: Observable<Bool>?
+    public var nameStreamSetCallCount: Int { self._nameStream.setCallCount }
+
+
+    public var klassSetCallCount: Int = 0
+    var underlyingKlass: Klass! {didSet {klassSetCallCount += 1}}
+    public var klass: Klass {
+        get { return underlyingKlass }
+        set {
+            underlyingKlass = newValue
+            if _doneInit { self.klassSetCallCount += 1 }
+        }
+    }
+
+}
+
+
+@propertyWrapper
+public struct Mockable<Value> {
+
+    public var stored: Value
+    public var setCallCount: Int = 0
+
+    public init(wrappedValue: Value) {
+        self.stored = wrappedValue
+    }
+
+    public var wrappedValue: Value {
+        get {
+            return stored
+        }
+
+        set {
+            stored = newValue
+            setCallCount += 1
+        }
+    }
+}
+
+
+
+
+public class Klass: NSObject {
+
+}
+public class Observable<T> {
+    typealias T = Any
+}
+//
+//@propertyWrapper
+//public struct MockObservable<Value> {
+//
+//    public var setCallCount: Int = 0
+//
+//    public var publishSubject = PublishSubject<Value.T>() { didSet { setCallCount += 1} }
+//    public var publishSubject = ReplaySubject<Value.T>.createInstance(bufferSize: 1) { didSet { setCallCount += 1} }
+//    public var behaviorSubject: BehaviorSubject<Value.T> { didSet { setCallCount += 1} }
+//    public var fallback: Value { didSet { setCallCount += 1} }
+//    var whichKind = 0
+//
+//    public init(wrappedValue: Value) {
+//        self.wrappedValue = wrappedValue
+//    }
+//
+//    public var wrappedValue: Value {
+//        get {
+//            if whichKind == 0 { return publishSubject }
+//            if whichKind == 1 { return replaySubject }
+//            if whichKind == 2 { return behaviorSubject }
+//            return fallback
+//        }
+//
+//        set {
+//            if let val = newValue as? PublishSubject<Value.T> {
+//                publishSubject = val
+//                whichKind = 0
+//            }
+//            else if let val = newValue as? ReplaySubject<Value.T> {
+//                replaySubject = val
+//                whichKind = 1
+//            }
+//            else if let val = newValue as? BehaviorSubject<Value.T> {
+//                behaviorSubject = val
+//                whichKind = 2
+//            } else {
+//                falback = newValue
+//                whichKind = 3
+//            }
+//        }
+//    }
+//}
+
+
+
+//
+//@propertyWrapper
+//public struct Observable<Value: Equatable> {
+//  private var stored: Value
+//
+//  public init(wrappedValue: Value) {
+//    self.stored = wrappedValue
+//  }
+//
+//  @available(*, unavailable)
+//  public var wrappedValue: Value {
+//    get { fatalError("only works on instance properties of classes") }
+//    set { fatalError("only works on instance properties of classes") }
+//  }
+//
+//  public static subscript<OuterSelf: Observed>(
+//      instanceSelf observed: OuterSelf,
+//      wrapped wrappedKeyPath: ReferenceWritableKeyPath<OuterSelf, Value>,
+//      storage storageKeyPath: ReferenceWritableKeyPath<OuterSelf, Self>
+//    ) -> Value {
+//    get {
+//      observed[keyPath: storageKeyPath].stored
+//    }
+//    set {
+//      let oldValue = observed[keyPath: storageKeyPath].stored
+//      if newValue != oldValue {
+//        observed.broadcastValueWillChange(newValue: newValue)
+//      }
+//      observed[keyPath: storageKeyPath].stored = newValue
+//    }
+//  }
+//}
+//
+//public protocol Observed {
+//  func broadcastValueWillChange<T>(newValue: T)
+//}
+//
+//
+//
+//public class Superclass {
+//
+//}
+//
+//public class MyClass: Superclass {
+//  @Observable public var myVar: Int = 17
+//
+////  // desugars to...
+////  private var _myVar: Observable<Int> = Observable(wrappedValue: 17)
+////  public var myVar: Int {
+////    get { Observable<Int>[instanceSelf: self, wrapped: \MyClass.myVar, storage: \MyClass._myVar] }
+////    set { Observable<Int>[instanceSelf: self, wrapped: \MyClass.myVar, storage: \MyClass._myVar] = newValue }
+////  }
+//
+//
+//}
+//
+#endif

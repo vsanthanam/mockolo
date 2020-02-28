@@ -16,6 +16,15 @@
 
 import Foundation
 
+//let blacklist = ["PluginizedScope", "Scope"]
+
+func blacklisted(name: String, type: String) -> Bool {
+    if name == "path", type == "[String]" {
+        return true
+    }
+    return false
+}
+
 func applyVariableTemplate(name: String,
                            type: Type,
                            typeKeys: [String: String]?,
@@ -42,7 +51,22 @@ func applyVariableTemplate(name: String,
     var setCallCountStmt = "\(underlyingSetCallCount) += 1"
     
     var template = ""
-    if !staticKind.isEmpty ||  underlyingVarDefaultVal.isEmpty {
+    if staticKind.isEmpty, !underlyingVarDefaultVal.isEmpty {
+        
+        let mockable = acl.contains("public") ? "@Mockable " : "@MockableInternal "
+        if !blacklisted(name: name, type: type.typeName) {
+            template = """
+            \(String.spaces4)\(acl)var \(underlyingSetCallCount): Int { return self._\(name).setCallCount }
+            \(String.spaces4)\(mockable)\(acl)\(overrideStr)var \(name): \(type.typeName) = \(underlyingVarDefaultVal)
+            """
+        } else {
+            template = """
+            \(String.spaces4)\(acl)var \(underlyingSetCallCount) = 0
+            \(String.spaces4)\(acl)\(overrideStr)var \(name): \(type.typeName) \(assignVal) { didSet { \(setCallCountStmt) } }
+            """
+        }
+    } else {
+
         if staticKind.isEmpty {
             setCallCountStmt = "if \(String.doneInit) { \(underlyingSetCallCount) += 1 }"
         }
@@ -60,13 +84,7 @@ func applyVariableTemplate(name: String,
         \(String.spaces8)}
         \(String.spaces4)}
         """
-    } else {
-        template = """
-        \(String.spaces4)\(acl)var \(underlyingSetCallCount) = 0
-        \(String.spaces4)\(acl)\(overrideStr)var \(name): \(type.typeName) \(assignVal) { didSet { \(setCallCountStmt) } }
-        """
     }
-    
     return template
 }
 
@@ -119,7 +137,6 @@ func applyRxVariableTemplate(name: String,
     let typeName = type.typeName
     if let range = typeName.range(of: String.observableVarPrefix), let lastIdx = typeName.lastIndex(of: ">") {
         let typeParamStr = typeName[range.upperBound..<lastIdx]
-        
         let underlyingSubjectName = "\(name)\(String.subjectSuffix)"
         let whichSubject = "\(underlyingSubjectName)Kind"
         let underlyingSetCallCount = "\(underlyingSubjectName)\(String.setCallCountSuffix)"
@@ -136,29 +153,186 @@ func applyRxVariableTemplate(name: String,
         let setCallCountStmt = staticStr.isEmpty ? "if \(String.doneInit) { \(underlyingSetCallCount) += 1 }" : "\(underlyingSetCallCount) += 1"
         let overrideStr = shouldOverride ? "\(String.override) " : ""
         
-        let template = """
-        \(String.spaces4)\(staticStr)private var \(whichSubject) = 0
-        \(String.spaces4)\(acl)\(staticStr)var \(underlyingSetCallCount) = 0
-        \(String.spaces4)\(acl)\(staticStr)var \(publishSubjectName) = \(publishSubjectType)() { didSet { \(setCallCountStmt) } }
-        \(String.spaces4)\(acl)\(staticStr)var \(replaySubjectName) = \(replaySubjectType).create(bufferSize: 1) { didSet { \(setCallCountStmt) } }
-        \(String.spaces4)\(acl)\(staticStr)var \(behaviorSubjectName): \(behaviorSubjectType)! { didSet { \(setCallCountStmt) } }
-        \(String.spaces4)\(acl)\(staticStr)var \(underlyingObservableName): \(underlyingObservableType)! { didSet { \(setCallCountStmt) } }
-        \(String.spaces4)\(acl)\(staticStr)\(overrideStr)var \(name): \(typeName) {
-        \(String.spaces8)get {
-        \(String.spaces12)if \(whichSubject) == 0 { return \(publishSubjectName) }
-        \(String.spaces12)else if \(whichSubject) == 1 { return \(behaviorSubjectName) }
-        \(String.spaces12)else if \(whichSubject) == 2 { return \(replaySubjectName) }
-        \(String.spaces12)else { return \(underlyingObservableName) }
-        \(String.spaces8)}
-        \(String.spaces8)set {
-        \(String.spaces12)if let val = newValue as? \(publishSubjectType) { \(whichSubject) = 0; \(publishSubjectName) = val }
-        \(String.spaces12)else if let val = newValue as? \(behaviorSubjectType) { \(whichSubject) = 1; \(behaviorSubjectName) = val }
-        \(String.spaces12)else if let val = newValue as? \(replaySubjectType) { \(whichSubject) = 2; \(replaySubjectName) = val }
-        \(String.spaces12)else { \(whichSubject) = 3; \(underlyingObservableName) = newValue }
-        \(String.spaces8)}
-        \(String.spaces4)}
-        """
+        var template = ""
+        let mockable = acl.contains("public") ? "@MockObservable " : "@MockObservableInternal "
+
+        if staticKind.isEmpty, !blacklisted(name: name, type: type.typeName), let underlyingVarDefaultVal = type.defaultVal(with: typeKeys) {
+            template = """
+            \(String.spaces4)\(acl)\(staticStr)var \(underlyingSetCallCount): Int { return self._\(name).setCallCount }
+            \(String.spaces4)\(acl)\(staticStr)var \(publishSubjectName): \(publishSubjectType) { return self._\(name).publishSubject }
+            \(String.spaces4)\(acl)\(staticStr)var \(replaySubjectName): \(replaySubjectType) { return self._\(name).replaySubject }
+            \(String.spaces4)\(acl)\(staticStr)var \(behaviorSubjectName): \(behaviorSubjectType) { return self._\(name).behaviorSubject }
+            \(String.spaces4)\(acl)\(staticStr)var \(underlyingObservableName): \(underlyingObservableType) { return self._\(name).fallback }
+            \(String.spaces4)\(mockable)\(acl)\(staticStr)\(overrideStr)var \(name): \(typeName) = \(underlyingVarDefaultVal)
+            """
+        } else {
+            template = """
+            \(String.spaces4)\(staticStr)private var \(whichSubject) = 0
+            \(String.spaces4)\(acl)\(staticStr)var \(underlyingSetCallCount) = 0
+            \(String.spaces4)\(acl)\(staticStr)var \(publishSubjectName) = \(publishSubjectType)() { didSet { \(setCallCountStmt) } }
+            \(String.spaces4)\(acl)\(staticStr)var \(replaySubjectName) = \(replaySubjectType).create(bufferSize: 1) { didSet { \(setCallCountStmt) } }
+            \(String.spaces4)\(acl)\(staticStr)var \(behaviorSubjectName): \(behaviorSubjectType)! { didSet { \(setCallCountStmt) } }
+            \(String.spaces4)\(acl)\(staticStr)var \(underlyingObservableName): \(underlyingObservableType)! { didSet { \(setCallCountStmt) } }
+            \(String.spaces4)\(acl)\(staticStr)\(overrideStr)var \(name): \(typeName) {
+            \(String.spaces8)get {
+            \(String.spaces12)if \(whichSubject) == 0 { return \(publishSubjectName) }
+            \(String.spaces12)else if \(whichSubject) == 1 { return \(behaviorSubjectName) }
+            \(String.spaces12)else if \(whichSubject) == 2 { return \(replaySubjectName) }
+            \(String.spaces12)else { return \(underlyingObservableName) }
+            \(String.spaces8)}
+            \(String.spaces8)set {
+            \(String.spaces12)if let val = newValue as? \(publishSubjectType) { \(whichSubject) = 0; \(publishSubjectName) = val }
+            \(String.spaces12)else if let val = newValue as? \(behaviorSubjectType) { \(whichSubject) = 1; \(behaviorSubjectName) = val }
+            \(String.spaces12)else if let val = newValue as? \(replaySubjectType) { \(whichSubject) = 2; \(replaySubjectName) = val }
+            \(String.spaces12)else { \(whichSubject) = 3; \(underlyingObservableName) = newValue }
+            \(String.spaces8)}
+            \(String.spaces4)}
+            """
+        }
+    
         return template
     }
     return nil
 }
+
+
+
+
+#if MOCK
+import RxSwift
+
+@propertyWrapper
+public struct MockObservable<Value: ObservableType> where Value.E: Any {
+
+    public var setCallCount: Int = 0
+    public var publishSubject = PublishSubject<Value.E>() { didSet { setCallCount += 1} }
+    public var replaySubject = ReplaySubject<Value.E>.create(bufferSize: 1) { didSet { setCallCount += 1} }
+    public var behaviorSubject: BehaviorSubject<Value.E>! { didSet { setCallCount += 1} }
+    public var fallback: Value! { didSet { setCallCount += 1} }
+    var whichKind = 0
+    
+    public init(wrappedValue: Value) {
+        self.wrappedValue = wrappedValue
+    }
+    
+    public var wrappedValue: Value {
+        get {
+            if whichKind == 0 { return publishSubject as! Value }
+            if whichKind == 1 { return replaySubject as! Value }
+            if whichKind == 2 { return behaviorSubject as! Value }
+            return fallback
+        }
+
+        set {
+            if let val = newValue as? PublishSubject<Value.E> {
+                publishSubject = val
+                whichKind = 0
+            }
+            else if let val = newValue as? ReplaySubject<Value.E> {
+                replaySubject = val
+                whichKind = 1
+            }
+            else if let val = newValue as? BehaviorSubject<Value.E> {
+                behaviorSubject = val
+                whichKind = 2
+            } else {
+                fallback = newValue
+                whichKind = 3
+            }
+        }
+    }
+}
+
+
+@propertyWrapper
+public struct Mockable<Value> {
+
+    public var stored: Value
+    public var setCallCount: Int = 0
+
+    public init(wrappedValue: Value) {
+        self.stored = wrappedValue
+    }
+    
+    public var wrappedValue: Value {
+        get {
+            return stored
+        }
+
+        set {
+            stored = newValue
+            setCallCount += 1
+        }
+    }
+}
+
+
+
+@propertyWrapper
+struct MockObservableInternal<Value: ObservableType> where Value.E: Any {
+
+    var setCallCount: Int = 0
+    var publishSubject = PublishSubject<Value.E>() { didSet { setCallCount += 1} }
+    var replaySubject = ReplaySubject<Value.E>.create(bufferSize: 1) { didSet { setCallCount += 1} }
+    var behaviorSubject: BehaviorSubject<Value.E>! { didSet { setCallCount += 1} }
+    var fallback: Value! { didSet { setCallCount += 1} }
+    var whichKind = 0
+    
+    init(wrappedValue: Value) {
+        self.wrappedValue = wrappedValue
+    }
+    
+    var wrappedValue: Value {
+        get {
+            if whichKind == 0 { return publishSubject as! Value }
+            if whichKind == 1 { return replaySubject as! Value }
+            if whichKind == 2 { return behaviorSubject as! Value }
+            return fallback
+        }
+
+        set {
+            if let val = newValue as? PublishSubject<Value.E> {
+                publishSubject = val
+                whichKind = 0
+            }
+            else if let val = newValue as? ReplaySubject<Value.E> {
+                replaySubject = val
+                whichKind = 1
+            }
+            else if let val = newValue as? BehaviorSubject<Value.E> {
+                behaviorSubject = val
+                whichKind = 2
+            } else {
+                fallback = newValue
+                whichKind = 3
+            }
+        }
+    }
+}
+
+
+@propertyWrapper
+struct MockableInternal<Value> {
+
+    var stored: Value
+    var setCallCount: Int = 0
+
+    init(wrappedValue: Value) {
+        self.stored = wrappedValue
+    }
+    
+    var wrappedValue: Value {
+        get {
+            return stored
+        }
+
+        set {
+            stored = newValue
+            setCallCount += 1
+        }
+    }
+}
+
+
+#endif
+

@@ -2,8 +2,8 @@ import MockoloFramework
 
 
 let rx = """
-/// \(String.mockAnnotation)(rx: attachedRouter = BehaviorSubject)
-protocol TaskRouting: BaseRouting {
+/// \(String.mockAnnotation)
+public protocol TaskRouting: BaseRouting {
     var attachedRouter: Observable<Bool> { get }
     func routeToFoo() -> Observable<()>
 }

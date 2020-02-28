@@ -38,6 +38,8 @@ func write(candidates: [(String, Int64)],
         break
     }
     
+    importLines.append("import PresidioFoundation")
+    
     var importLineStr = ""
     
     if let testableImports = testableImports {

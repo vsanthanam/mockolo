@@ -166,3 +166,27 @@ private func extraInitsIfNeeded(initParamCandidates: [Model],
     return template
 }
 
+
+
+@propertyWrapper
+struct Mockable<Value> {
+
+    var stored: Value
+    var setCallCount: Int = 0
+
+    init(wrappedValue: Value) {
+        self.stored = wrappedValue
+    }
+    
+    var wrappedValue: Value {
+        get {
+            return stored
+        }
+
+        set {
+            stored = newValue
+            setCallCount += 1
+        }
+    }
+}
+

@@ -50,6 +50,7 @@ extension String {
     static let anyObject = "AnyObject"
     static let fatalError = "fatalError"
     static let available = "available"
+    static let `public` = "public"
     static let `open` = "open"
     static let initializer = "init"
     static let handlerSuffix = "Handler"
@@ -77,6 +78,7 @@ extension String {
     static let `escaping` = "@escaping"
     static let autoclosure = "@autoclosure"
     static public let mockAnnotation = "@mockable"
+    static public let mockObservable = "@MockObservable"
     static public let poundIf = "#if "
     static public let poundEndIf = "#endif"
     static public let headerDoc =

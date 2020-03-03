@@ -29,7 +29,7 @@ func scanDirectory(_ path: String, with callBack: (String) -> Void) {
     }
 }
 
-func scanPaths(_ paths: [String], with callBack: (String) -> Void) {
+public func scanPaths(_ paths: [String], with callBack: (String) -> Void) {
     for path in paths {
         scanDirectory(path, with: callBack)
     }

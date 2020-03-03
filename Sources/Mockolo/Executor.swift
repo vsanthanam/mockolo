@@ -24,15 +24,16 @@ class Executor {
     // MARK: - Private
     private var loggingLevel: OptionArgument<Int>!
     private var outputFilePath: OptionArgument<String>!
+    private var mockFileList: OptionArgument<String>!
     private var mockFilePaths: OptionArgument<[String]>!
     private var sourceDirs: OptionArgument<[String]>!
     private var sourceFiles: OptionArgument<[String]>!
     private var sourceFileList: OptionArgument<String>!
-    private var depFileList: OptionArgument<String>!
     private var exclusionSuffixes: OptionArgument<[String]>!
     private var header: OptionArgument<String>!
     private var macro: OptionArgument<String>!
     private var testableImports: OptionArgument<[String]>!
+    private var customImports: OptionArgument<[String]>!
     private var annotation: OptionArgument<String>!
     private var concurrencyLimit: OptionArgument<Int>!
     private var useSourceKit: OptionArgument<Bool>!
@@ -70,15 +71,14 @@ class Executor {
                                 kind: [String].self,
                                 usage: "Paths to the directories containing source files to generate mocks for. If the --filelist or --sourcefiles values exist, they will be ignored. ",
                                 completion: .filename)
-        depFileList = parser.add(option: "--depfilelist",
-                                   shortName: "-deplist",
+        mockFileList = parser.add(option: "--mock-filelist",
                                    kind: String.self,
-                                   usage: "Path to a file containing a list of dependent files (separated by a new line) from modules this target depends on. ",
+                                   usage: "Path to a file containing a list of dependent files (separated by a new line) of modules this target depends on.",
                                    completion: .filename)
         mockFilePaths = parser.add(option: "--mockfiles",
                                    shortName: "-mocks",
                                    kind: [String].self,
-                                   usage: "List of mock files (separated by a comma or a space) from modules this target depends on. If the --depfilelist value exists, this will be ignored.",
+                                   usage: "List of mock files (separated by a comma or a space) from modules this target depends on. If the --mock-filelist value exists, this will be ignored.",
                                    completion: .filename)
         outputFilePath = parser.add(option: "--destination",
                                     shortName: "-d",
@@ -102,6 +102,10 @@ class Executor {
                                         shortName: "-i",
                                         kind: [String].self,
                                         usage: "If set, @testable import statments will be added for each module name in this list.")
+        customImports = parser.add(option: "--custom-imports",
+                                        shortName: "-c",
+                                        kind: [String].self,
+                                        usage: "If set, custom module imports will be added to the final import statement list.")
         header = parser.add(option: "--header",
                                 kind: String.self,
                                 usage: "A custom header documentation to be added to the beginning of a generated mock file.")
@@ -129,7 +133,34 @@ class Executor {
     ///
     /// - parameter arguments: The command line arguments to execute the command with.
     func execute(with arguments: ArgumentParser.Result) {
-      
+//      let maxConcurrentThreads = 12 //concurrencyLimit ?? 0
+//      let sema = maxConcurrentThreads <= 1 ? nil: DispatchSemaphore(value: maxConcurrentThreads)
+//      let q = maxConcurrentThreads == 1 ? nil: DispatchQueue(label: "mockgen-q", qos: DispatchQoS.userInteractive, attributes: DispatchQueue.Attributes.concurrent)
+//        let dirs = ["/Users/ellieshin/Developer/uber/ios/apps", "/Users/ellieshin/Developer/uber/ios/libraries"]
+//        if let queue = q {
+////            let lock = NSLock()
+//            
+//            scanPaths(dirs) { filePath in
+//                _ = sema?.wait(timeout: DispatchTime.distantFuture)
+//                queue.async {
+//                    if filePath.hasSuffix(".swift"), !(filePath.hasSuffix("Mocks.swift") || filePath.hasSuffix("Tests.swift") || filePath.hasSuffix("Mock.swift") ||  filePath.hasSuffix("Tests.swift") || filePath.hasSuffix("Images.swift") || filePath.hasSuffix("Strings.swift") || filePath.hasSuffix("Models.swift") || filePath.hasSuffix("Model.swift")),
+//                        let str = try? String(contentsOfFile: filePath) {
+//                        var mutableStr = str
+//                        if let r = str.range(of: "\n\n///(s)*(\\w)+\n[p]", options: .regularExpression, range: nil, locale: nil) {
+//                            let ret = mutableStr.replacingOccurrences(of: "\n\n///(s)*\n[p]", with: "\n\np", options: .regularExpression, range: nil)
+//                            print(filePath)
+//                            try? ret.write(toFile: filePath, atomically: true, encoding: .utf8)
+//                        }
+//                    }
+//                    sema?.signal()
+//                }
+//            }
+//            
+//            // Wait for queue to drain
+//            queue.sync(flags: .barrier) {}
+//        }
+//
+        
         guard let outputArg = arguments.get(outputFilePath) else { fatalError("Missing destination file path") }
         let outputFilePath = fullPath(outputArg)
 
@@ -148,14 +179,15 @@ class Executor {
         }
         
         var mockFilePaths: [String]?
-        // If dep file list exists, mock filepaths value will be overriden (see the usage in setupArguments above)
-        if let depList = arguments.get(self.depFileList) {
-            let text = try? String(contentsOfFile: depList, encoding: String.Encoding.utf8)
+        // First see if a list of mock files are stored in a file
+        if let mockList = arguments.get(self.mockFileList) {
+            let text = try? String(contentsOfFile: mockList, encoding: String.Encoding.utf8)
             mockFilePaths = text?.components(separatedBy: "\n").filter{!$0.isEmpty}.map(fullPath)
         } else {
-             mockFilePaths = arguments.get(self.mockFilePaths)?.map(fullPath)
+            // If not, see if a list of mock files are directly passed in
+            mockFilePaths = arguments.get(self.mockFilePaths)?.map(fullPath)
         }
-
+        
         let concurrencyLimit = arguments.get(self.concurrencyLimit)
         let exclusionSuffixes = arguments.get(self.exclusionSuffixes) ?? []
         let annotation = arguments.get(self.annotation) ?? String.mockAnnotation
@@ -164,6 +196,7 @@ class Executor {
         let macro = arguments.get(self.macro)
         let testableImports = arguments.get(self.testableImports)
         let shouldUseSourceKit = arguments.get(useSourceKit) ?? false
+        let customImports = arguments.get(self.customImports)
 
         do {
             try generate(sourceDirs: srcDirs,
@@ -175,6 +208,7 @@ class Executor {
                          header: header,
                          macro: macro,
                          testableImports: testableImports,
+                         customImports: customImports,
                          to: outputFilePath,
                          loggingLevel: loggingLevel,
                          concurrencyLimit: concurrencyLimit,
@@ -187,3 +221,4 @@ class Executor {
         }
     }
 }
+

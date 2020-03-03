@@ -588,10 +588,12 @@ final class EntityVisitor: SyntaxVisitor {
                 entities.append(ent)
             }
         } else {
+            #if MockClass
             let metadata = node.annotationMetadata(with: annotation)
             if let ent = Entity.node(with: node, isPrivate: node.isPrivate, isFinal: node.isFinal, metadata: metadata, processed: false) {
                 entities.append(ent)
             }
+            #endif
         }
         return .skipChildren
     }

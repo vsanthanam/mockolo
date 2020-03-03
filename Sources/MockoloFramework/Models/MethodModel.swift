@@ -211,7 +211,7 @@ final class MethodModel: Model {
                 }
             }
             
-            if let ret = modelDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? self.data?.toString(offset: offset, length: length) {
+            if let ret = modelDescription?.trimmingCharacters(in: .newlines) ?? self.data?.toString(offset: offset, length: length) {
                 return prefix + ret
             }
             return nil

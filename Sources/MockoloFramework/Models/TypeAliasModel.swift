@@ -92,9 +92,9 @@ final class TypeAliasModel: Model {
     func render(with identifier: String, typeKeys: [String: String]? = nil) -> String? {
         if processed || useDescription, let modelDescription = modelDescription?.trimmingCharacters(in: .whitespacesAndNewlines) {
             if addAcl {
-                return accessControlLevelDescription + " " + modelDescription
+                return "\(1.tab)\(accessControlLevelDescription) \(modelDescription)"
             }
-            return modelDescription
+            return "\(1.tab)\(modelDescription)"
         }
         
         return applyTypealiasTemplate(name: name, type: type, acl: accessControlLevelDescription)

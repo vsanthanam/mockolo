@@ -27,6 +27,8 @@ public enum ParserType {
     case random
 }
 
+var shouldAddCustomImports = false
+
 /// Performs end to end mock generation flow
 public func generate(sourceDirs: [String]?,
                      sourceFiles: [String]?,
@@ -37,11 +39,13 @@ public func generate(sourceDirs: [String]?,
                      header: String?,
                      macro: String?,
                      testableImports: [String]?,
+                     customImports: [String]?,
                      to outputFilePath: String,
                      loggingLevel: Int,
                      concurrencyLimit: Int?,
                      onCompletion: @escaping (String) -> ()) throws {
-    
+    shouldAddCustomImports = false
+
     guard sourceDirs != nil || sourceFiles != nil else {
         log("Source files or directories do not exist", level: .error)
         throw InputError.sourceFilesError
@@ -162,6 +166,7 @@ public func generate(sourceDirs: [String]?,
                        header: header,
                        macro: macro,
                        testableImports: testableImports,
+                       customImports: customImports,
                        to: outputFilePath)
     signpost_end(name: "Write results")
     let t5 = CFAbsoluteTimeGetCurrent()

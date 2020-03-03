@@ -52,7 +52,7 @@ final class ClassModel: Model {
         self.metadata = metadata
         self.offset = offset
         self.attribute = Set(attributes.filter {$0.contains(String.available)}).joined(separator: " ")
-        self.accessControlLevelDescription = acl.isEmpty ? "" : acl + " "
+        self.accessControlLevelDescription = acl
     }
     
     func render(with identifier: String, typeKeys: [String: String]? = nil) -> String? {

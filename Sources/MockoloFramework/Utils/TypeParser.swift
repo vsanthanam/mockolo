@@ -78,6 +78,10 @@ public struct Type {
         return ret
     }
     
+    // TODO: correct this
+    var isTuple: Bool {
+        return typeName.contains(",")
+    }
     /// Returns true if this type is a single atomic type (e.g. an identifier, a tuple, etc).
     /// If it can be split into an input / output, e.g. T -> U, it will return false.
     /// Note that (T -> U) will be considered atomic, but T -> U won't.
@@ -304,9 +308,14 @@ public struct Type {
     
     /// Parses a type string containing (nested) tuples or brackets and returns a default value for each type component
     func defaultVal(with typeKeys: [String: String]? = nil, overrides: [String: String]? = nil, overrideKey: String = "", isInitParam: Bool = false) -> String? {
-        let (subjectType, subjectVal) = parseRxVar(overrides: overrides, overrideKey: overrideKey, isInitParam: isInitParam)
+        let (subjectType, typeParam, subjectVal) = parseRxVar(overrides: overrides, overrideKey: overrideKey, isInitParam: isInitParam)
         if subjectType != nil {
-            return isInitParam ? subjectVal : (typeName.hasSuffix(String.rxObservableLeftAngleBracket) ? String.rxObservableEmpty : String.observableEmpty)
+            let prefix = typeName.hasPrefix(String.rxObservableLeftAngleBracket) ? String.rxObservableLeftAngleBracket : String.observableLeftAngleBracket
+            var rxEmpty = String.observableEmpty
+            if let t = typeParam {
+                rxEmpty = "\(prefix)\(t)>.empty()"
+            }
+            return isInitParam ? subjectVal : rxEmpty
         }
 
         if let val = parseDefaultVal(isInitParam: isInitParam, overrides: overrides, overrideKey: overrideKey) {
@@ -319,7 +328,7 @@ public struct Type {
         return nil
     }
 
-    func parseRxVar(overrides: [String: String]?, overrideKey: String, isInitParam: Bool) -> (String?, String?) {
+    func parseRxVar(overrides: [String: String]?, overrideKey: String, isInitParam: Bool) -> (String?, String?, String?) {
         if typeName.hasPrefix(String.observableLeftAngleBracket) || typeName.hasPrefix(String.rxObservableLeftAngleBracket),
             let range = typeName.range(of: String.observableLeftAngleBracket), let lastIdx = typeName.lastIndex(of: ">") {
             let typeParamStr = typeName[range.upperBound..<lastIdx]
@@ -349,9 +358,9 @@ public struct Type {
                     underlyingSubjectTypeDefaultVal = "\(underlyingSubjectType)(value: \(val))"
                 }
             }
-            return (underlyingSubjectType, underlyingSubjectTypeDefaultVal)
+            return (underlyingSubjectType, String(typeParamStr), underlyingSubjectTypeDefaultVal)
         }
-        return (nil, nil)
+        return (nil, nil, nil)
     }
     
     private func parseDefaultVal(isInitParam: Bool, overrides: [String: String]?, overrideKey: String = "") -> String? {

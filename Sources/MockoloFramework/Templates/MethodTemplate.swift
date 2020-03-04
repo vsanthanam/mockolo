@@ -70,29 +70,62 @@ extension MethodModel {
             }
             
         default:
+            
+            guard let handler = handler else { return "" }
+            
             let callCount = "\(identifier)\(String.callCountSuffix)"
             let handlerVarName = "\(identifier)\(String.handlerSuffix)"
-            let handlerVarType = handler?.type.typeName ?? "Any"
-            let handlerReturn = handler?.render(with: identifier, typeKeys: typeKeys) ?? ""
+            let handlerVarType = handler.type.typeName // ?? "Any"
+            let handlerReturn = handler.render(with: identifier, typeKeys: typeKeys) ?? ""
             
             let suffixStr = suffix.isEmpty ? "" : "\(suffix) "
             let returnStr = returnTypeName.isEmpty ? "" : "-> \(returnTypeName)"
             let staticStr = staticKind.isEmpty ? "" : "\(staticKind) "
             let isSubscript = kind == .subscriptKind
             let keyword = isSubscript ? "" : "func "
-            let body =
-            """
-            \(2.tab)\(callCount) += 1
-            \(handlerReturn)
-            """
+            var body = ""
             
-            let wrapped = !isSubscript ? body :
-            """
-            \(2.tab)get {
-            \(body)
-            \(2.tab)}
-            \(2.tab)set { }
-            """
+            let tupleParams = params.filter{$0.type.isTuple || $0.type.hasClosure }
+            let callMockFunc = tupleParams.isEmpty && params.count <= 1 && !suffix.isThrowsOrRethrows && (handler.type.cast?.isEmpty ?? false)
+
+            if callMockFunc {
+                let handlerParamValsStr = params.map { (arg) -> String in
+                    if arg.type.typeName.hasPrefix(String.autoclosure) {
+                        return arg.name.safeName + "()"
+                    }
+                    return arg.name.safeName
+                }.joined(separator: ", ")
+                
+                let defaultVal = type.defaultVal(with: typeKeys) ?? "nil"
+                
+                var list = [""]
+                if !handlerParamValsStr.isEmpty {
+                    list.append("args: \(handlerParamValsStr)")
+                }
+                if !returnType.typeName.isEmpty {
+                    list.append("defaultVal: \(defaultVal)")
+                }
+                let append = list.joined(separator: ", ")
+                
+                body = """
+                \(2.tab)mockFunc(\"\(name)\", count: &\(callCount), closure: \(handlerVarName)\(append))
+                """
+            } else {
+                body = """
+                \(2.tab)\(callCount) += 1
+                \(handlerReturn)
+                """
+            }
+
+            var wrapped = body
+            if isSubscript {
+                wrapped = """
+                \(2.tab)get {
+                \(body)
+                \(2.tab)}
+                \(2.tab)set { }
+                """
+            }
             
             let overrideStr = isOverride ? "\(String.override) " : ""
             template =
@@ -107,4 +140,101 @@ extension MethodModel {
         
         return template
     }
+}
+
+
+public func mockFunc<U>(_ name: String, count: inout Int, closure: ((Any...) -> U)?, args: Any..., defaultVal: U?) -> U {
+    count += 1
+    if let closure = closure {
+        return closure(args)
+    }
+    
+    if let val = defaultVal {
+        return val
+    }
+    
+    fatalError("\(name) handler must be set as there's no default value to return")
+}
+
+//  (Void) -> ()
+//  (Void) -> (Void)
+//  (Void) -> (Int)
+//  (Int) -> ()
+//  (Int) -> (Void)
+//  (Int) -> (Int)
+public func mockFunc<T, U>(_ name: String, count: inout Int, closure: ((T) -> U)?, args: T, defaultVal: U?) -> U {
+    count += 1
+    if let closure = closure {
+        return closure(args)
+    }
+    
+    if let val = defaultVal {
+        return val
+    }
+    
+    fatalError("\(name) handler must be set as there's no default value to return")
+}
+
+
+// () -> (Int)
+public func mockFunc<U>(_ name: String, count: inout Int, closure: (() -> (U))?, defaultVal: U?) -> U {
+    count += 1
+    if let closure = closure {
+        return closure()
+    }
+    
+    if let val = defaultVal {
+        return val
+    }
+    
+    fatalError("\(name) handler must be set as there's no default value to return")
+}
+
+
+
+//  (Void) -> ()
+//  (Void) -> (Void)
+//  (Int) -> ()
+//  (Int) -> (Void)
+public func mockFunc<T, U>(_ name: String, count: inout Int, closure: ((T) -> (U))?, args: T) {
+    count += 1
+    if let closure = closure {
+        closure(args)
+    }
+}
+
+// () -> () or () -> (Void)
+public func mockFunc(_ name: String, count: inout Int, closure: (() -> ())?) {
+    count += 1
+    if let closure = closure {
+        closure()
+    }
+}
+
+
+
+/////////////
+
+//  (Void) -> ()
+//  (Void) -> (Void)
+//  (Void) -> (Int?)
+//  (Int) -> ()
+//  (Int) -> (Void)
+//  (Int) -> (Int?)
+public func mockFunc<T, U: ExpressibleByNilLiteral>(_ name: String, count: inout Int, closure: ((T) -> (U))?, args: T, defaultVal: U) -> U {
+    count += 1
+    if let closure = closure {
+        return closure(args)
+    }
+    return defaultVal
+}
+
+
+// () -> (Int?)
+public func mockFunc<U: ExpressibleByNilLiteral>(_ name: String, count: inout Int, closure: (() -> (U))?, defaultVal: U) -> U {
+    count += 1
+    if let closure = closure {
+        return closure()
+    }
+    return defaultVal
 }

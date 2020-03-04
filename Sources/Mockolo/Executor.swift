@@ -160,6 +160,8 @@ class Executor {
 //            queue.sync(flags: .barrier) {}
 //        }
 //
+//        let x = X()
+//        x.clear()
         
         guard let outputArg = arguments.get(outputFilePath) else { fatalError("Missing destination file path") }
         let outputFilePath = fullPath(outputArg)
@@ -222,3 +224,37 @@ class Executor {
     }
 }
 
+
+
+public class X {
+    public var clearCallCount = 0
+    public var clearHandler: ((Void) -> (Void))? = { _ in }
+    public var handler1: ((Void) -> ())? = { _ in }
+    public var handler2: ((Void) -> (Void))? = { _ in }
+    public var handler3: (() -> (Void))? = { }
+    public var handler4: (() -> ())? = { }
+
+
+    public var handler11: ((Int) -> ())? = { _ in }
+    public var handler12: ((Int) -> Int)? = { _ in return 4 }
+    public var handler13: (() -> Int)? = { return 4 }
+
+    public var handler21: ((Int) -> (Void))? = { _ in }
+    public var handler22: ((Void) -> Int)? = { _ in return 4 }
+
+    public func clear() {
+//        mockFunc("clear", count: &clearCallCount, closure: clearHandler, args: ())
+        mockFunc("clear", count: &clearCallCount, closure: clearHandler, args: ())
+        mockFunc("clear", count: &clearCallCount, closure: handler2, args: ())
+        mockFunc("clear", count: &clearCallCount, closure: handler3)
+        mockFunc("clear", count: &clearCallCount, closure: handler4)
+
+
+        mockFunc("clear", count: &clearCallCount, closure: handler11, args: (11))
+        mockFunc("clear", count: &clearCallCount, closure: handler12, args: (12))
+        mockFunc("clear", count: &clearCallCount, closure: handler13, defaultVal: 13)
+
+        mockFunc("clear", count: &clearCallCount, closure: handler21, args: (21))
+        mockFunc("clear", count: &clearCallCount, closure: handler22, args: ())
+    }
+}

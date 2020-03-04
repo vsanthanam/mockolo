@@ -39,7 +39,7 @@ func write(candidates: [(String, Int64)],
         break
     }
     
-    if shouldAddCustomImports, let customImports = customImports {
+    if let customImports = customImports {
         importLines.append(contentsOf: customImports.map {$0.asImport})
     }
     

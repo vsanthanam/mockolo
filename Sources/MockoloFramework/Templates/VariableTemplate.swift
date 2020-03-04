@@ -80,7 +80,7 @@ extension VariableModel {
                                  shouldOverride: Bool,
                                  accessControlLevelDescription: String) -> String? {
         if let overrideTypes = overrideTypes, !overrideTypes.isEmpty {
-            let (subjectType, subjectVal) = type.parseRxVar(overrides: overrideTypes, overrideKey: name, isInitParam: true)
+            let (subjectType, typeParam, subjectVal) = type.parseRxVar(overrides: overrideTypes, overrideKey: name, isInitParam: true)
             if let underlyingSubjectType = subjectType {
                 
                 let underlyingSubjectName = "\(name)\(String.subjectSuffix)"
@@ -136,7 +136,6 @@ extension VariableModel {
             let staticStr = staticKind.isEmpty ? "" : "\(staticKind) "
             //            let setCallCountStmt = staticStr.isEmpty ? "if \(String.doneInit) { \(underlyingSetCallCount) += 1 }" : "\(underlyingSetCallCount) += 1"
             let overrideStr = shouldOverride ? "\(String.override) " : ""
-            shouldAddCustomImports = true
 
             var mockObservableInitArgs = ""
             if type.isIUO || type.isOptional {

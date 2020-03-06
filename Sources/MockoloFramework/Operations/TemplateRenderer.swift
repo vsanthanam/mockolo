@@ -19,7 +19,6 @@ import Foundation
 /// Renders models with temeplates for output
 
 func renderTemplates(entities: [ResolvedEntity],
-                     typeKeys: [String: String]?,
                      semaphore: DispatchSemaphore?,
                      queue: DispatchQueue?,
                      completion: @escaping (String, Int64) -> ()) {
@@ -28,25 +27,24 @@ func renderTemplates(entities: [ResolvedEntity],
         for element in entities {
             _ = semaphore?.wait(timeout: DispatchTime.distantFuture)
             queue.async {
-                _ = renderTemplates(resolvedEntity: element, typeKeys: typeKeys, lock: lock, completion: completion)
+                _ = renderTemplates(resolvedEntity: element, lock: lock, completion: completion)
                 semaphore?.signal()
             }
         }
         queue.sync(flags: .barrier) { }
     } else {
         for element in entities {
-            _ = renderTemplates(resolvedEntity: element, typeKeys: typeKeys, lock: nil, completion: completion)
+            _ = renderTemplates(resolvedEntity: element, lock: nil, completion: completion)
         }
     }
 }
 
 private func renderTemplates(resolvedEntity: ResolvedEntity,
-                             typeKeys: [String: String]?,
                              lock: NSLock? = nil,
                              completion: @escaping (String, Int64) -> ()) -> Bool {
     
     let mockModel = resolvedEntity.model()
-    if let mockString = mockModel.render(with: resolvedEntity.key, typeKeys: typeKeys), !mockString.isEmpty {
+    if let mockString = mockModel.render(with: resolvedEntity.key, encloser: mockModel.name), !mockString.isEmpty {
         lock?.lock()
         completion(mockString, mockModel.offset)
         lock?.unlock()

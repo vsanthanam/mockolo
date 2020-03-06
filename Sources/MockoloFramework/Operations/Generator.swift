@@ -27,6 +27,8 @@ public enum ParserType {
     case random
 }
 
+var shouldAddCustomImports = false
+
 /// Performs end to end mock generation flow
 public func generate(sourceDirs: [String]?,
                      sourceFiles: [String]?,
@@ -37,11 +39,13 @@ public func generate(sourceDirs: [String]?,
                      header: String?,
                      macro: String?,
                      testableImports: [String]?,
+                     customImports: [String]?,
                      to outputFilePath: String,
                      loggingLevel: Int,
                      concurrencyLimit: Int?,
                      onCompletion: @escaping (String) -> ()) throws {
-    
+    shouldAddCustomImports = false
+
     guard sourceDirs != nil || sourceFiles != nil else {
         log("Source files or directories do not exist", level: .error)
         throw InputError.sourceFilesError
@@ -122,13 +126,13 @@ public func generate(sourceDirs: [String]?,
     typeKeyList.forEach { (t: String) in
         typeKeys[t] = "\(t)Mock()"
     }
+    Type.customTypeMap = typeKeys
     
     log("Resolve inheritance and generate unique entity models...", level: .info)
     
     generateUniqueModels(protocolMap: protocolMap,
                          annotatedProtocolMap: annotatedProtocolMap,
                          inheritanceMap: parentMocks,
-                         typeKeys: typeKeys,
                          semaphore: sema,
                          queue: mockgenQueue,
                          completion: { container in
@@ -143,7 +147,6 @@ public func generate(sourceDirs: [String]?,
     signpost_begin(name: "Render models")
     log("Render models with templates...", level: .info)
     renderTemplates(entities: resolvedEntities,
-                    typeKeys: typeKeys,
                     semaphore: sema,
                     queue: mockgenQueue,
                     completion: { (mockString: String, offset: Int64) in
@@ -162,6 +165,7 @@ public func generate(sourceDirs: [String]?,
                        header: header,
                        macro: macro,
                        testableImports: testableImports,
+                       customImports: customImports,
                        to: outputFilePath)
     signpost_end(name: "Write results")
     let t5 = CFAbsoluteTimeGetCurrent()

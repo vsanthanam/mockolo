@@ -22,12 +22,18 @@ fileprivate var validIdentifierChars: CharacterSet = {
     return valid
 }()
 
-public struct Type {
+public final class Type {
     let typeName: String
     let cast: String?
+    var cachedDefaultVal: String?
+    
     init(_ type: String, cast: String? = nil){
         self.typeName = type == .unknownVal ? "" : type
         self.cast = cast
+    }
+    
+    var isRxObservable: Bool {
+        return typeName.hasPrefix(.rxObservableLeftAngleBracket) || typeName.hasPrefix(.observableLeftAngleBracket)
     }
     
     var isUnknown: Bool {
@@ -78,6 +84,10 @@ public struct Type {
         return ret
     }
     
+    // TODO: correct this
+    var isTuple: Bool {
+        return typeName.contains(",")
+    }
     /// Returns true if this type is a single atomic type (e.g. an identifier, a tuple, etc).
     /// If it can be split into an input / output, e.g. T -> U, it will return false.
     /// Note that (T -> U) will be considered atomic, but T -> U won't.
@@ -303,23 +313,41 @@ public struct Type {
     
     
     /// Parses a type string containing (nested) tuples or brackets and returns a default value for each type component
-    func defaultVal(with typeKeys: [String: String]? = nil, overrides: [String: String]? = nil, overrideKey: String = "", isInitParam: Bool = false) -> String? {
-        let (subjectType, subjectVal) = parseRxVar(overrides: overrides, overrideKey: overrideKey, isInitParam: isInitParam)
-        if subjectType != nil {
-            return isInitParam ? subjectVal : (typeName.hasSuffix(String.rxObservableLeftAngleBracket) ? String.rxObservableEmpty : String.observableEmpty)
-        }
-
-        if let val = parseDefaultVal(isInitParam: isInitParam, overrides: overrides, overrideKey: overrideKey) {
+    ///
+    ///  if nil, no default val available
+    ///  if "nil", type is optional
+    ///  if "non-nil", type is non-optional
+    ///  if "", type is stirng, so empty string
+    func defaultVal(with overrides: [String: String]? = nil, overrideKey: String = "", isInitParam: Bool = false) -> String? {
+        
+        if let val = cachedDefaultVal {
             return val
         }
         
-        if let val = typeKeys?[typeName] {
+        let (subjectType, typeParam, subjectVal) = parseRxVar(overrides: overrides, overrideKey: overrideKey, isInitParam: isInitParam)
+        if subjectType != nil {
+            let prefix = typeName.hasPrefix(String.rxObservableLeftAngleBracket) ? String.rxObservableLeftAngleBracket : String.observableLeftAngleBracket
+            var rxEmpty = String.observableEmpty
+            if let t = typeParam {
+                rxEmpty = "\(prefix)\(t)>.empty()"
+            }
+            cachedDefaultVal = isInitParam ? subjectVal : rxEmpty
+            return cachedDefaultVal
+        }
+
+        if let val = parseDefaultVal(isInitParam: isInitParam, overrides: overrides, overrideKey: overrideKey) {
+            cachedDefaultVal = val
+            return cachedDefaultVal
+        }
+        
+        if let val = Type.customTypeMap[typeName] {
+            cachedDefaultVal = val
             return val
         }
         return nil
     }
 
-    func parseRxVar(overrides: [String: String]?, overrideKey: String, isInitParam: Bool) -> (String?, String?) {
+    func parseRxVar(overrides: [String: String]?, overrideKey: String, isInitParam: Bool) -> (String?, String?, String?) {
         if typeName.hasPrefix(String.observableLeftAngleBracket) || typeName.hasPrefix(String.rxObservableLeftAngleBracket),
             let range = typeName.range(of: String.observableLeftAngleBracket), let lastIdx = typeName.lastIndex(of: ">") {
             let typeParamStr = typeName[range.upperBound..<lastIdx]
@@ -349,9 +377,9 @@ public struct Type {
                     underlyingSubjectTypeDefaultVal = "\(underlyingSubjectType)(value: \(val))"
                 }
             }
-            return (underlyingSubjectType, underlyingSubjectTypeDefaultVal)
+            return (underlyingSubjectType, String(typeParamStr), underlyingSubjectTypeDefaultVal)
         }
-        return (nil, nil)
+        return (nil, nil, nil)
     }
     
     private func parseDefaultVal(isInitParam: Bool, overrides: [String: String]?, overrideKey: String = "") -> String? {
@@ -391,7 +419,7 @@ public struct Type {
         return nil
     }
 
-    func defaultSingularVal(isInitParam: Bool = false, overrides: [String: String]? = nil, overrideKey: String = "") -> String? {
+    private func defaultSingularVal(isInitParam: Bool = false, overrides: [String: String]? = nil, overrideKey: String = "") -> String? {
         let arg = self
         
         if arg.isOptional {
@@ -410,7 +438,7 @@ public struct Type {
             return "\(arg.typeName)()"
         }
         
-        if let val = defaultTypeValueMap[arg.typeName] {
+        if let val = Type.defaultTypeValueMap[arg.typeName] {
             return val
         }
         return nil
@@ -541,50 +569,52 @@ public struct Type {
             return ret
         }
     }
-}
+    
+    public static var customTypeMap = [String: String]()
 
+    private static let defaultTypeValueMap =
+        ["Int": "0",
+         "Int8": "0",
+         "Int16": "0",
+         "Int32": "0",
+         "Int64": "0",
+         "UInt": "0",
+         "UInt8": "0",
+         "UInt16": "0",
+         "UInt32": "0",
+         "UInt64": "0",
+         "CGFloat": "0.0",
+         "Float": "0.0",
+         "Double": "0.0",
+         "Bool": "false",
+         "String": "\"\"",
+         "Character": "\"\"",
+         "TimeInterval": "0.0",
+         "NSTimeInterval": "0.0",
+         "PublishSubject": "PublishSubject()",
+         "Date": "Date()",
+         "NSDate": "NSDate()",
+         "CGRect": ".zero",
+         "CGSize": ".zero",
+         "CGPoint": ".zero",
+         "UIEdgeInsets": ".zero",
+         "UIColor": ".black",
+         "UIFont": ".systemFont(ofSize: 12)",
+         "UIImage": "UIImage()",
+         "UIView": "UIView(frame: .zero)",
+         "UIViewController": "UIViewController()",
+         "UICollectionView": "UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())",
+         "UICollectionViewLayout": "UICollectionViewLayout()",
+         "UIScrollView": "UIScrollView()",
+         "UIScrollViewKeyboardDismissMode": ".interactive",
+         "UIAccessibilityTraits": ".none",
+         "Void": "Void",
+         "URL": "URL(fileURLWithPath: \"\")",
+         "NSURL": "NSURL(fileURLWithPath: \"\")",
+         "UUID": "UUID()",
+    ];
 
-private let defaultTypeValueMap =
-    ["Int": "0",
-     "Int8": "0",
-     "Int16": "0",
-     "Int32": "0",
-     "Int64": "0",
-     "UInt": "0",
-     "UInt8": "0",
-     "UInt16": "0",
-     "UInt32": "0",
-     "UInt64": "0",
-     "CGFloat": "0.0",
-     "Float": "0.0",
-     "Double": "0.0",
-     "Bool": "false",
-     "String": "\"\"",
-     "Character": "\"\"",
-     "TimeInterval": "0.0",
-     "NSTimeInterval": "0.0",
-     "PublishSubject": "PublishSubject()",
-     "Date": "Date()",
-     "NSDate": "NSDate()",
-     "CGRect": ".zero",
-     "CGSize": ".zero",
-     "CGPoint": ".zero",
-     "UIEdgeInsets": ".zero",
-     "UIColor": ".black",
-     "UIFont": ".systemFont(ofSize: 12)",
-     "UIImage": "UIImage()",
-     "UIView": "UIView(frame: .zero)",
-     "UIViewController": "UIViewController()",
-     "UICollectionView": "UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())",
-     "UICollectionViewLayout": "UICollectionViewLayout()",
-     "UIScrollView": "UIScrollView()",
-     "UIScrollViewKeyboardDismissMode": ".interactive",
-     "UIAccessibilityTraits": ".none",
-     "Void": "Void",
-     "URL": "URL(fileURLWithPath: \"\")",
-     "NSURL": "NSURL(fileURLWithPath: \"\")",
-     "UUID": "UUID()",
-];
+    }
 
 
 enum BracketType {

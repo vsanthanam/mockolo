@@ -36,7 +36,7 @@ final class MethodModel: Model {
     let params: [ParamModel]
     let processed: Bool
     var modelDescription: String? = nil
-    let isStatic: Bool
+    var isStatic: Bool
     let shouldOverride: Bool
     let suffix: String
     let kind: MethodKind
@@ -44,7 +44,7 @@ final class MethodModel: Model {
         return .method
     }
     
-    var staticKind: String {
+    private var staticKind: String {
         return isStatic ? .static : ""
     }
     
@@ -94,8 +94,7 @@ final class MethodModel: Model {
                                paramNames: paramNames,
                                paramTypes: paramTypes,
                                suffix: suffix,
-                               returnType: type,
-                               staticKind: staticKind)
+                               returnType: type)
         
         return ret
     }()
@@ -201,7 +200,7 @@ final class MethodModel: Model {
         return name(by: level - 1) + postfix
     }
     
-    func render(with identifier: String, typeKeys: [String: String]? = nil) -> String? {
+    func render(with identifier: String, encloser: String) -> String? {
         if processed {
             var prefix = shouldOverride  ? "\(String.override) " : ""
 
@@ -211,7 +210,7 @@ final class MethodModel: Model {
                 }
             }
             
-            if let ret = modelDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? self.data?.toString(offset: offset, length: length) {
+            if let ret = modelDescription?.trimmingCharacters(in: .newlines) ?? self.data?.toString(offset: offset, length: length) {
                 return prefix + ret
             }
             return nil
@@ -220,15 +219,14 @@ final class MethodModel: Model {
         let result = applyMethodTemplate(name: name,
                                          identifier: identifier,
                                          kind: kind,
+                                         isStatic: isStatic,
                                          isOverride: shouldOverride,
                                          genericTypeParams: genericTypeParams,
                                          params: params,
                                          returnType: type,
-                                         staticKind: staticKind,
                                          accessControlLevelDescription: accessControlLevelDescription,
                                          suffix: suffix,
-                                         handler: handler,
-                                         typeKeys: typeKeys)
+                                         handler: handler)
         return result
     }
 }

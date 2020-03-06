@@ -52,10 +52,10 @@ final class ClassModel: Model {
         self.metadata = metadata
         self.offset = offset
         self.attribute = Set(attributes.filter {$0.contains(String.available)}).joined(separator: " ")
-        self.accessControlLevelDescription = acl.isEmpty ? "" : acl + " "
+        self.accessControlLevelDescription = acl
     }
     
-    func render(with identifier: String, typeKeys: [String: String]? = nil) -> String? {
-        return applyClassTemplate(name: name, identifier: self.identifier, typeKeys: typeKeys, accessControlLevelDescription: accessControlLevelDescription, attribute: attribute, declType: declType, metadata: metadata, initParamCandidates: initParamCandidates, declaredInits: declaredInits, entities: entities)
+    func render(with identifier: String, encloser: String) -> String? {
+        return applyClassTemplate(name: name, identifier: self.identifier, accessControlLevelDescription: accessControlLevelDescription, attribute: attribute, declType: declType, metadata: metadata, initParamCandidates: initParamCandidates, declaredInits: declaredInits, entities: entities)
     }
 }

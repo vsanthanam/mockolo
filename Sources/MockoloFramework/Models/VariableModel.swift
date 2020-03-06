@@ -15,20 +15,17 @@ final class VariableModel: Model {
     var isStatic = false
     var shouldOverride = false
     var overrideTypes: [String: String]?
-
+    var cachedDefaultTypeVal: String?
     var modelDescription: String? = nil
     var modelType: ModelType {
         return .variable
     }
 
-    var staticKind: String {
-        return isStatic ? .static : ""
+    var fullName: String {
+        let suffix = isStatic ? String.static : ""
+        return name + suffix
     }
 
-    var fullName: String {
-        return name + staticKind
-    }
-    
     init(name: String,
          typeName: String,
          acl: String?,
@@ -71,23 +68,14 @@ final class VariableModel: Model {
         self.filePath = filepath
     }
     
-    private func isGenerated(_ name: String, type: Type) -> Bool {
-        return name.hasPrefix(.underlyingVarPrefix) ||
-            name.hasSuffix(.setCallCountSuffix) ||
-            name.hasSuffix(.callCountSuffix) ||
-            name.hasSuffix(.subjectSuffix) ||
-            name.hasSuffix("SubjectKind") ||
-            (name.hasSuffix(.handlerSuffix) && type.isOptional)
-    }
-    
-    func render(with identifier: String, typeKeys: [String: String]?) -> String? {
+    func render(with identifier: String, encloser: String) -> String? {
         
         if processed {
             var prefix = ""
-            if shouldOverride, !isGenerated(name, type: type) {
+            if shouldOverride, !name.isGenerated(type: type) {
                 prefix = "\(String.override) "
             }
-            if let modelDescription = modelDescription?.trimmingCharacters(in: .whitespacesAndNewlines), !modelDescription.isEmpty {
+            if let modelDescription = modelDescription?.trimmingCharacters(in: .newlines), !modelDescription.isEmpty {
                 return prefix + modelDescription
             }
             
@@ -107,16 +95,16 @@ final class VariableModel: Model {
         if let rxVar = applyRxVariableTemplate(name: identifier,
                                                type: type,
                                                overrideTypes: overrideTypes,
-                                               typeKeys: typeKeys,
-                                               staticKind: staticKind,
+                                               encloser: encloser,
+                                               isStatic: isStatic,
                                                shouldOverride: shouldOverride,
                                                accessControlLevelDescription: accessControlLevelDescription) {
             return rxVar
         }
         return applyVariableTemplate(name: identifier,
                                      type: type,
-                                     typeKeys: typeKeys, 
-                                     staticKind: staticKind,
+                                     encloser: encloser,
+                                     isStatic: isStatic,
                                      shouldOverride: shouldOverride,
                                      accessControlLevelDescription: accessControlLevelDescription)
     }

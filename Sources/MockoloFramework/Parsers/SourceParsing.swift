@@ -25,7 +25,7 @@ public protocol SourceParsing {
     
     /// Parses processed decls (mock classes) and calls a completion block
     func parseProcessedDecls(_ paths: [String],
-                             completion: @escaping ([Entity], [String: [String]]?) -> ())
+                             completion: @escaping ([Entity], ImportMap?) -> ())
     
     /// Parses decls (protocol, class) with annotations (/// @mockable) and calls a completion block
     func parseDecls(_ paths: [String]?,
@@ -33,5 +33,5 @@ public protocol SourceParsing {
                     exclusionSuffixes: [String]?,
                     annotation: String,
                     declType: DeclType,
-                    completion: @escaping ([Entity], [String: [String]]?) -> ())
+                    completion: @escaping ([Entity], ImportMap?) -> ())
 }

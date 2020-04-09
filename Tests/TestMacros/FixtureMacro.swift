@@ -1,5 +1,57 @@
 import MockoloFramework
 
+let macroImports = """
+import X
+import Y
+
+#if DEBUG
+import Z
+import W
+#endif
+
+import V
+
+/// \(String.mockAnnotation)
+public protocol SomeProtocol: Parent {
+    func run()
+}
+"""
+
+let parentMock = """
+import Foundation
+
+public class ParentMock: Parent {
+    public init() {}
+}
+"""
+
+let macroImportsMock = """
+import Foundation
+import V
+import X
+import Y
+#if DEBUG
+import W
+import Z
+#endif
+
+
+public class SomeProtocolMock: SomeProtocol {
+    public init() { }
+
+    public var runCallCount = 0
+    public var runHandler: (() -> ())?
+    public func run()  {
+        runCallCount += 1
+        if let runHandler = runHandler {
+            runHandler()
+        }
+
+    }
+}
+
+"""
+
 
 let macro =
 """

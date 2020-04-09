@@ -18,10 +18,11 @@ import Foundation
 import SourceKittenFramework
 
 public class ParserViaSourceKit: SourceParsing {
+
     public init() {}
     
     public func parseProcessedDecls(_ paths: [String],
-                                    completion: @escaping ([Entity], [String: [String]]?) -> ()) {
+                                    completion: @escaping ([Entity], ImportMap?) -> ()) {
          scan(paths) { (filePath, lock) in
             self.generateProcessedASTs(filePath, lock: lock, completion: completion)
         }
@@ -32,7 +33,7 @@ public class ParserViaSourceKit: SourceParsing {
                            exclusionSuffixes: [String]? = nil,
                            annotation: String,
                            declType: DeclType,
-                           completion: @escaping ([Entity], [String: [String]]?) -> ()) {
+                           completion: @escaping ([Entity], ImportMap?) -> ()) {
         guard !annotation.isEmpty else { return }
         guard let paths = paths else { return }
         if isDirs {
@@ -46,7 +47,7 @@ public class ParserViaSourceKit: SourceParsing {
                                   exclusionSuffixes: [String]? = nil,
                                   annotation: String,
                                   declType: DeclType,
-                                  completion: @escaping ([Entity], [String: [String]]?) -> ()) {
+                                  completion: @escaping ([Entity], ImportMap?) -> ()) {
         
         guard let annotationData = annotation.data(using: .utf8) else {
             fatalError("Annotation is invalid: \(annotation)")
@@ -66,7 +67,7 @@ public class ParserViaSourceKit: SourceParsing {
                               exclusionSuffixes: [String]? = nil,
                               annotation: String,
                               declType: DeclType,
-                              completion: @escaping ([Entity], [String: [String]]?) -> ()) {
+                              completion: @escaping ([Entity], ImportMap?) -> ()) {
         guard let annotationData = annotation.data(using: .utf8) else {
             fatalError("Annotation is invalid: \(annotation)")
         }
@@ -86,7 +87,7 @@ public class ParserViaSourceKit: SourceParsing {
                                   annotationData: Data,
                                   declType: DeclType,
                                   lock: NSLock?,
-                                  completion: @escaping ([Entity], [String: [String]]?) -> ()) {
+                                  completion: @escaping ([Entity], ImportMap?) -> ()) {
         
         guard path.shouldParse(with: exclusionSuffixes) else { return }
         guard let content = FileManager.default.contents(atPath: path) else {
@@ -127,7 +128,7 @@ public class ParserViaSourceKit: SourceParsing {
     
     private func generateProcessedASTs(_ path: String,
                                            lock: NSLock?,
-                                           completion: @escaping ([Entity], [String: [String]]) -> ()) {
+                                           completion: @escaping ([Entity], ImportMap?) -> ()) {
         
         guard let content = FileManager.default.contents(atPath: path) else {
             fatalError("Retrieving contents of \(path) failed")
@@ -140,9 +141,9 @@ public class ParserViaSourceKit: SourceParsing {
                 return Entity.node(with: current, filepath: path, data: content, isPrivate: current.isPrivate, isFinal: current.isFinal, metadata: nil, processed: true)
             }
             
-            let imports = findImportLines(data: content, offset: subs.first?.offset)
+            let imports = content.findImportLines(at: subs.first?.offset)
             lock?.lock()
-            completion(results, [path: imports])
+            completion(results, [path: ["": imports]])
             lock?.unlock()
         } catch {
             fatalError(error.localizedDescription)

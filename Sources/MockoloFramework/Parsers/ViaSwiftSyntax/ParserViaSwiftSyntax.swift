@@ -21,7 +21,7 @@ public class ParserViaSwiftSyntax: SourceParsing {
     public init() {}
     
     public func parseProcessedDecls(_ paths: [String],
-                                    completion: @escaping ([Entity], [String: [String]]?) -> ()) {
+                                    completion: @escaping ([Entity], ImportMap?) -> ()) {
         scan(paths) { (path, lock) in
             self.generateASTs(path, annotation: "", declType: .classType, lock: lock, completion: completion)
         }
@@ -32,7 +32,7 @@ public class ParserViaSwiftSyntax: SourceParsing {
                            exclusionSuffixes: [String]? = nil,
                            annotation: String,
                            declType: DeclType,
-                           completion: @escaping ([Entity], [String: [String]]?) -> ()) {
+                           completion: @escaping ([Entity], ImportMap?) -> ()) {
         
         guard let paths = paths else { return }
         scan(paths, isDirectory: isDirs) { (path, lock) in
@@ -50,7 +50,7 @@ public class ParserViaSwiftSyntax: SourceParsing {
                               annotation: String,
                               declType: DeclType,
                               lock: NSLock?,
-                              completion: @escaping ([Entity], [String: [String]]?) -> ()) {
+                              completion: @escaping ([Entity], ImportMap?) -> ()) {
         
         guard path.shouldParse(with: exclusionSuffixes) else { return }
 
@@ -77,11 +77,11 @@ public class ParserViaSwiftSyntax: SourceParsing {
             #endif
             let ret = treeVisitor.entities
             results.append(contentsOf: ret)
-            let imports = treeVisitor.imports
+            let importMap = treeVisitor.imports
 
             lock?.lock()
             defer {lock?.unlock()}
-            completion(results, [path: imports])
+            completion(results, [path: importMap])
         } catch {
             fatalError(error.localizedDescription)
         }

@@ -242,21 +242,24 @@ extension IfConfigDeclSyntax {
 
         var name = ""
         for cl in self.clauses {
-            if let desc = cl.condition?.description, let list = cl.elements.as(MemberDeclListSyntax.self) {
-                name = desc
-                
-                for element in list {
-                    if let (item, attr, initFlag) = element.transformToModel(with: encloserAcl, declType: declType, metadata: metadata, processed: processed) {
-                        subModels.append(item)
-                        if let attr = attr, attr.contains(String.available) {
-                            attrDesc = attr
+            if let desc = cl.condition?.description {
+                if let list = cl.elements.as(MemberDeclListSyntax.self) {
+                    name = desc
+                    for element in list {
+                        if let (item, attr, initFlag) = element.transformToModel(with: encloserAcl, declType: declType, metadata: metadata, processed: processed) {
+                            subModels.append(item)
+                            if let attr = attr, attr.contains(String.available) {
+                                attrDesc = attr
+                            }
+                            hasInit = hasInit || initFlag
                         }
-                        hasInit = hasInit || initFlag
                     }
+                } else if let list = cl.elements.as(ImportDeclSyntax.self) {
+
                 }
             }
         }
-        
+
         let macroModel = IfMacroModel(name: name, offset: self.offset, entities: subModels)
         return (macroModel, attrDesc, hasInit)
     }
@@ -573,7 +576,7 @@ extension TypealiasDeclSyntax {
 
 final class EntityVisitor: SyntaxVisitor {
     var entities: [Entity] = []
-    var imports: [String] = []
+    var imports: [String: [String]] = [:]
     let annotation: String
     let path: String
     let declType: DeclType
@@ -583,11 +586,6 @@ final class EntityVisitor: SyntaxVisitor {
         self.declType = declType
     }
     
-    func reset() {
-        entities = []
-        imports = []
-    }
-
     #if swift(>=5.2)
     override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind { visitImpl(node) }
     #else
@@ -634,11 +632,46 @@ final class EntityVisitor: SyntaxVisitor {
     private func visitImpl(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
         if let ret = node.path.firstToken?.text {
             let desc = node.importTok.text + " " + ret
-            imports.append(desc)
+            if imports[""] == nil {
+                imports[""] = []
+            }
+            imports[""]?.append(desc)
         }
         return .visitChildren
     }
-    
+
+    #if swift(>=5.2)
+    override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind { visitImpl(node) }
+    #else
+    func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind { visitImpl(node) }
+    #endif
+
+    private func visitImpl(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
+        for cl in node.clauses {
+            if let ident = cl.condition?.as(IdentifierExprSyntax.self),
+                let list = cl.elements.as(CodeBlockItemListSyntax.self) {
+
+                for el in list {
+                    if let _ = el.item.as(ImportDeclSyntax.self) {
+                    } else {
+                        return .visitChildren
+                    }
+                }
+
+                for el in list {
+                    if let importItem = el.item.as(ImportDeclSyntax.self) {
+                        let key = ident.identifier.text
+                        if imports[key] == nil {
+                            imports[key] = []
+                        }
+                        imports[key]?.append(importItem.description.trimmingCharacters(in: .whitespacesAndNewlines))
+                    }
+                }
+            }
+        }
+        return .skipChildren
+    }
+
     #if swift(>=5.2)
     override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
         return .skipChildren
